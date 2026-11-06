@@ -1610,11 +1610,15 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
                 break;
             }
             let lower = line.to_ascii_lowercase();
-            if lower.starts_with("content-security-policy:") {
-                let modified = line.replace("frame-ancestors 'self'", "frame-ancestors 'self' * https://tauri.localhost http://tauri.localhost tauri://localhost");
-                new_resp_headers.push(modified);
-            } else if lower.starts_with("x-frame-options:") {
-                // Rimuovi per consentire l'embed nell'iframe
+            if lower.starts_with("content-security-policy:")
+                || lower.starts_with("content-security-policy-report-only:")
+                || lower.starts_with("x-frame-options:")
+                || lower.starts_with("cross-origin-opener-policy:")
+                || lower.starts_with("cross-origin-embedder-policy:")
+                || lower.starts_with("cross-origin-resource-policy:")
+            {
+                // Rimuovi completamente restrizioni CSP, framing e isolation per consentire l'embed trasparente in WebView2
+                continue;
             } else if lower.starts_with("access-control-allow-origin:") {
                 new_resp_headers.push("Access-Control-Allow-Origin: *".to_string());
                 has_cors = true;
@@ -1625,8 +1629,8 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
 
         if !has_cors {
             new_resp_headers.push("Access-Control-Allow-Origin: *".to_string());
-            new_resp_headers.push("Access-Control-Allow-Methods: GET, POST, OPTIONS".to_string());
-            new_resp_headers.push("Access-Control-Allow-Headers: Content-Type, Authorization".to_string());
+            new_resp_headers.push("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE".to_string());
+            new_resp_headers.push("Access-Control-Allow-Headers: Content-Type, Authorization, *".to_string());
         }
 
         new_resp_headers.push(String::new());
