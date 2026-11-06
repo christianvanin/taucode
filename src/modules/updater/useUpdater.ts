@@ -42,11 +42,15 @@ export function useUpdater() {
     } catch (err: unknown) {
       console.warn("Controllo aggiornamenti fallito o non in runtime Tauri:", err);
       if (manual) {
-        setErrorMessage(
+        const errorMsg =
           err instanceof Error
             ? err.message
-            : "Impossibile contattare il server di aggiornamento GitHub.",
-        );
+            : typeof err === "string"
+              ? err
+              : typeof err === "object" && err !== null && "message" in err
+                ? String((err as { message: unknown }).message)
+                : "Impossibile contattare il server di aggiornamento GitHub.";
+        setErrorMessage(errorMsg);
         setStatus("error");
       } else {
         setStatus("idle");
@@ -83,9 +87,15 @@ export function useUpdater() {
       setStatus("ready");
     } catch (err: unknown) {
       console.error("Installazione aggiornamento fallita:", err);
-      setErrorMessage(
-        err instanceof Error ? err.message : "Errore durante il download dell'aggiornamento.",
-      );
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : typeof err === "object" && err !== null && "message" in err
+              ? String((err as { message: unknown }).message)
+              : "Errore durante il download dell'aggiornamento.";
+      setErrorMessage(errorMsg);
       setStatus("error");
     }
   }, [updateInfo]);
