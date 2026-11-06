@@ -752,7 +752,7 @@ export function AiSection() {
           {status?.executable_path && (
             <SettingRow
               title="Percorso Binario Dedicato"
-              description="Posizione locale isolata del file eseguibile terax-antigravity."
+              description="Posizione locale isolata del file eseguibile taucode-antigravity."
             >
               <span className="font-mono text-[10.5px] text-muted-foreground select-all break-all max-w-[280px] text-right">
                 {status.executable_path}
