@@ -58,8 +58,8 @@ Thumbs.db
 test-icons/
 *.exe.old.*
 
-# TauCode Extensions (Local repository ignored by git push)
-extensions/
+# TauCode Extensions (Local folder ignored by git push)
+/extensions/
 *.tauext
 
 # Clean export directory
