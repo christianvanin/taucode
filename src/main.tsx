@@ -11,17 +11,27 @@ import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
   const w = getCurrentWindow();
-  const updateMaximized = () => {
-    void w.isMaximized().then((max) => {
-      if (max) {
-        document.documentElement.dataset.maximized = "true";
-      } else {
-        delete document.documentElement.dataset.maximized;
-      }
-    });
+  const updateWindowState = () => {
+    const check = () => {
+      void Promise.all([w.isMaximized(), w.isFullscreen()]).then(([max, full]) => {
+        if (max || full) {
+          document.documentElement.dataset.maximized = "true";
+        } else {
+          delete document.documentElement.dataset.maximized;
+        }
+        if (full) {
+          document.documentElement.dataset.fullscreen = "true";
+        } else {
+          delete document.documentElement.dataset.fullscreen;
+        }
+      });
+    };
+    check();
+    setTimeout(check, 50);
   };
-  updateMaximized();
-  void w.onResized(updateMaximized);
+  updateWindowState();
+  void w.onResized(updateWindowState);
+  window.addEventListener("resize", updateWindowState);
 }
 
 // Render-instrumentation overlay, opt-in: `VITE_REACT_SCAN=true pnpm dev`.

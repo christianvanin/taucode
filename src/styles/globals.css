@@ -220,9 +220,12 @@ html[data-chrome="borderless"] #settings-root {
 }
 html[data-chrome="borderless"][data-maximized="true"] #root,
 html[data-chrome="borderless"][data-maximized="true"] #settings-root,
-html[data-chrome="borderless"][data-maximized="true"] .terax-bg-surface {
-  border-radius: 0;
-  border: none;
+html[data-chrome="borderless"][data-maximized="true"] .terax-bg-surface,
+html[data-chrome="borderless"][data-fullscreen="true"] #root,
+html[data-chrome="borderless"][data-fullscreen="true"] #settings-root,
+html[data-chrome="borderless"][data-fullscreen="true"] .terax-bg-surface {
+  border-radius: 0 !important;
+  border: none !important;
 }
 
 /*

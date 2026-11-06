@@ -22,15 +22,26 @@ export function WindowControls({ closeOnly = false }: Props) {
     if (!USE_CUSTOM_WINDOW_CONTROLS || closeOnly) return;
     const w = getCurrentWindow();
     let unlisten: (() => void) | undefined;
-    void w.isMaximized().then(setMaximized);
+    const update = () => {
+      const check = () => {
+        void Promise.all([w.isMaximized(), w.isFullscreen()]).then(([max, full]) => {
+          setMaximized(max || full);
+        });
+      };
+      check();
+      setTimeout(check, 50);
+    };
+    update();
     void w
-      .onResized(() => {
-        void w.isMaximized().then(setMaximized);
-      })
+      .onResized(update)
       .then((un) => {
         unlisten = un;
       });
-    return () => unlisten?.();
+    window.addEventListener("resize", update);
+    return () => {
+      unlisten?.();
+      window.removeEventListener("resize", update);
+    };
   }, [closeOnly]);
 
   if (!USE_CUSTOM_WINDOW_CONTROLS) return null;
@@ -46,7 +57,19 @@ export function WindowControls({ closeOnly = false }: Props) {
           </CtlButton>
           <CtlButton
             ariaLabel={maximized ? "Restore" : "Maximize"}
-            onClick={() => void w.toggleMaximize()}
+            onClick={() => {
+              void (async () => {
+                try {
+                  if (await w.isFullscreen()) {
+                    await w.setFullscreen(false);
+                  } else {
+                    await w.toggleMaximize();
+                  }
+                } catch (e) {
+                  console.error("toggleMaximize/fullscreen failed:", e);
+                }
+              })();
+            }}
           >
             <HugeiconsIcon
               icon={maximized ? Copy01Icon : SquareIcon}

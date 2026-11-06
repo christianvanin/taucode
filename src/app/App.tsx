@@ -1422,7 +1422,20 @@ listen<{
             if (!isFull && (await w.isMaximized())) {
               await w.unmaximize();
             }
-            await w.setFullscreen(!isFull);
+            const next = !isFull;
+            if (next) {
+              document.documentElement.dataset.fullscreen = "true";
+              document.documentElement.dataset.maximized = "true";
+            } else {
+              delete document.documentElement.dataset.fullscreen;
+              const isMax = await w.isMaximized();
+              if (isMax) {
+                document.documentElement.dataset.maximized = "true";
+              } else {
+                delete document.documentElement.dataset.maximized;
+              }
+            }
+            await w.setFullscreen(next);
           } catch (err) {
             console.error("toggleFullscreen failed:", err);
           }
