@@ -1577,9 +1577,70 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
     backend.flush()?;
 
     let mut client_write = client_stream;
+
+    // Leggi e patcha gli header della risposta dal backend per abilitare CORS e frame-ancestors
+    let mut resp_header_buf = Vec::with_capacity(2048);
+    let mut temp = [0u8; 1024];
+    let mut header_end_pos = None;
+
+    loop {
+        let n = backend.read(&mut temp)?;
+        if n == 0 {
+            break;
+        }
+        resp_header_buf.extend_from_slice(&temp[..n]);
+        if let Some(pos) = resp_header_buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            header_end_pos = Some(pos);
+            break;
+        }
+        if resp_header_buf.len() > 65536 {
+            break;
+        }
+    }
+
+    if let Some(pos) = header_end_pos {
+        let header_str = String::from_utf8_lossy(&resp_header_buf[..pos]);
+        let body_prefix = &resp_header_buf[pos + 4..];
+
+        let mut new_resp_headers = Vec::new();
+        let mut has_cors = false;
+
+        for line in header_str.split("\r\n") {
+            if line.is_empty() {
+                break;
+            }
+            let lower = line.to_ascii_lowercase();
+            if lower.starts_with("content-security-policy:") {
+                let modified = line.replace("frame-ancestors 'self'", "frame-ancestors 'self' * https://tauri.localhost http://tauri.localhost tauri://localhost");
+                new_resp_headers.push(modified);
+            } else if lower.starts_with("x-frame-options:") {
+                // Rimuovi per consentire l'embed nell'iframe
+            } else if lower.starts_with("access-control-allow-origin:") {
+                new_resp_headers.push("Access-Control-Allow-Origin: *".to_string());
+                has_cors = true;
+            } else {
+                new_resp_headers.push(line.to_string());
+            }
+        }
+
+        if !has_cors {
+            new_resp_headers.push("Access-Control-Allow-Origin: *".to_string());
+            new_resp_headers.push("Access-Control-Allow-Methods: GET, POST, OPTIONS".to_string());
+            new_resp_headers.push("Access-Control-Allow-Headers: Content-Type, Authorization".to_string());
+        }
+
+        new_resp_headers.push(String::new());
+        new_resp_headers.push(String::new());
+
+        let mut out_header = new_resp_headers.join("\r\n").into_bytes();
+        out_header.extend_from_slice(body_prefix);
+        let _ = client_write.write_all(&out_header);
+    } else {
+        let _ = client_write.write_all(&resp_header_buf);
+    }
+
     let _ = std::io::copy(&mut backend, &mut client_write);
     let _ = client_write.flush();
-    let _ = client_write.shutdown(std::net::Shutdown::Both);
 
     Ok(())
 }
