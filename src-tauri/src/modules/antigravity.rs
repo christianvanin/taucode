@@ -664,6 +664,16 @@ fn fetch_and_patch_main_js() -> std::io::Result<Arc<Vec<u8>>> {
         "null",
     );
 
+    // Universal fix: Authorize tauri.localhost, tauri://localhost, and localhost origins in Antigravity RPC postMessage validator
+    body_str = body_str.replace(
+        "if(m===\"localhost\"||m===\"127.0.0.1\"",
+        "if(m===\"localhost\"||m.endsWith(\"localhost\")||m===\"127.0.0.1\"",
+    );
+    body_str = body_str.replace(
+        "function Lid(a,b=window.location.origin,c){if(!a||a===\"null\")return!1;",
+        "function Lid(a,b=window.location.origin,c){if(!a||a===\"null\")return!1;if(a.includes(\"localhost\")||a.includes(\"127.0.0.1\"))return!0;",
+    );
+
     let patched_body = body_str.into_bytes();
     let header = format!(
         "HTTP/1.1 200 OK\r\n\

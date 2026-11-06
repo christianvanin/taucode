@@ -445,12 +445,14 @@ function AntigravityPaneComponent({
         return;
       }
 
-      // Isola i messaggi: se questo pannello ha un iframe attivo, ignora messaggi da altri iframe
-      if (iframeRef.current?.contentWindow && ev.source !== iframeRef.current.contentWindow) {
-        return;
-      }
-
       const data = ev.data;
+      // Isola i messaggi: non scartare le chiamate RPC di Antigravity
+      if (iframeRef.current?.contentWindow && ev.source !== iframeRef.current.contentWindow) {
+        const isAgyRpc = data && typeof data === "object" && data.channel === "agy-ext-extension-api";
+        if (!isAgyRpc) {
+          return;
+        }
+      }
       if (data && typeof data === "object") {
         // Gestione RPC per Antigravity Extension API
         if (
@@ -756,7 +758,8 @@ function AntigravityPaneComponent({
           try {
             if (ev.source && "postMessage" in ev.source) {
               (ev.source as WindowProxy).postMessage(replyMessage, "*");
-            } else if (iframeRef.current?.contentWindow) {
+            }
+            if (iframeRef.current?.contentWindow && ev.source !== iframeRef.current.contentWindow) {
               iframeRef.current.contentWindow.postMessage(replyMessage, "*");
             }
             if (showDebugRef.current) {
