@@ -41,7 +41,7 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-process = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-updater = "2"
+tauri-plugin-updater = "2.14.1"
 include_dir = { version = "0.7", features = ["glob"] }
 reqwest = { version = "0.12", default-features = false, features = [
 	"rustls-tls",
