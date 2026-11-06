@@ -50,6 +50,13 @@ interface AntigravityStatus {
   executable_path: string | null;
 }
 
+interface AntigravityDownloadProgress {
+  downloaded: number;
+  total: number | null;
+  percentage: number;
+  phase: "downloading" | "installing" | "completed";
+}
+
 interface ProbeResult {
   ok: boolean;
   status?: number;
@@ -159,8 +166,21 @@ function AntigravityPaneComponent({
   const [status, setStatus] = useState<AntigravityStatus | null>(null);
   const [checking, setChecking] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<AntigravityDownloadProgress | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<AntigravityDownloadProgress>("antigravity-download-progress", (ev) => {
+      setDownloadProgress(ev.payload);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // Debug Panel States (default false così l'interfaccia principale è pulita)
   const [showDebug, setShowDebug] = useState(false);
@@ -206,15 +226,21 @@ function AntigravityPaneComponent({
     setLogs([...logsRef.current]);
   }, []);
 
-  // Health-check loop: attende che il server risponda su http://127.0.0.1:8085/
-  const waitForBackend = useCallback(async (maxRetries = 60): Promise<boolean> => {
+  // Health-check loop: attende che il server risponda su http://127.0.0.1:8085/api/health
+  const waitForBackend = useCallback(async (maxRetries = 80): Promise<boolean> => {
     for (let i = 0; i < maxRetries; i++) {
       try {
-        await fetch("http://127.0.0.1:8085/", { mode: "no-cors" });
-        return true;
+        const res = await fetch("http://127.0.0.1:8085/api/health", { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json().catch(() => null)) as { ok?: boolean; backend?: boolean } | null;
+          if (data?.backend) {
+            return true;
+          }
+        }
       } catch {
-        await new Promise((r) => setTimeout(r, 250));
+        // Attende che sia il proxy sia il backend completino il binding
       }
+      await new Promise((r) => setTimeout(r, 250));
     }
     return false;
   }, []);
@@ -322,6 +348,25 @@ function AntigravityPaneComponent({
     }
   }, [waitForBackend, addLog, runProbe]);
 
+  const handleInstallOrUpdate = useCallback(async () => {
+    setInstalling(true);
+    setError(null);
+    addLog("info", "Avvio install_or_update_antigravity...");
+    try {
+      await invoke("install_or_update_antigravity");
+      const res = await invoke<AntigravityStatus>("get_antigravity_status");
+      setStatus(res);
+      await startBackend();
+    } catch (e) {
+      const msg = String(e);
+      setError(msg);
+      addLog("error", `Errore aggiornamento: ${msg}`);
+    } finally {
+      setInstalling(false);
+      setDownloadProgress(null);
+    }
+  }, [addLog, startBackend]);
+
   const loadStatus = useCallback(async () => {
     setChecking(true);
     setError(null);
@@ -333,6 +378,9 @@ function AntigravityPaneComponent({
       // Se installato, avviamo SEMPRE il backend (la presenza di un update non blocca l'esecuzione)
       if (res.installed) {
         void startBackend();
+      } else {
+        // Se primo avvio su installazione pulita, scarica e configura automaticamente il motore
+        void handleInstallOrUpdate();
       }
     } catch (e) {
       const msg = String(e);
@@ -341,7 +389,7 @@ function AntigravityPaneComponent({
     } finally {
       setChecking(false);
     }
-  }, [startBackend, addLog]);
+  }, [startBackend, handleInstallOrUpdate, addLog]);
 
   useEffect(() => {
     void loadStatus();
@@ -747,23 +795,7 @@ function AntigravityPaneComponent({
     };
   }, [addLog]);
 
-  const handleInstallOrUpdate = async () => {
-    setInstalling(true);
-    setError(null);
-    addLog("info", "Avvio install_or_update_antigravity...");
-    try {
-      await invoke("install_or_update_antigravity");
-      const res = await invoke<AntigravityStatus>("get_antigravity_status");
-      setStatus(res);
-      await startBackend();
-    } catch (e) {
-      const msg = String(e);
-      setError(msg);
-      addLog("error", `Errore aggiornamento: ${msg}`);
-    } finally {
-      setInstalling(false);
-    }
-  };
+
 
   const handleOpenExternal = async () => {
     try {
@@ -865,47 +897,62 @@ function AntigravityPaneComponent({
           </div>
         )}
 
-        {/* Not Installed State: Primo avvio */}
-        {!checking && !error && !status?.installed && (
+        {/* Not Installed / Downloading State: Primo avvio */}
+        {!checking && !error && (!status?.installed || installing) && (
           <div className="flex h-full flex-col items-center justify-center p-6 text-center">
             <div className="mb-5 flex items-center justify-center">
               <img
                 src="/antigravity/antigravity.svg"
                 alt="Antigravity Logo"
-                className="size-16 object-contain drop-shadow-md select-none pointer-events-none"
+                className={`size-16 object-contain drop-shadow-md select-none pointer-events-none ${installing ? "animate-pulse" : ""}`}
               />
             </div>
             <h3 className="mb-1.5 text-base font-semibold text-foreground">
-              Installa Antigravity nell'IDE
+              {installing ? "Configurazione motore AI Antigravity" : "Installa Antigravity nell'IDE"}
             </h3>
-            <p className="mb-2 max-w-[340px] text-xs leading-relaxed text-muted-foreground">
-              Questo IDE utilizza una copia dedicata e isolata di Antigravity nei propri dati locali.
+            <p className="mb-4 max-w-[340px] text-xs leading-relaxed text-muted-foreground">
+              {installing
+                ? "Download e configurazione del runtime locale isolato in corso..."
+                : "Questo IDE utilizza una copia dedicata e isolata di Antigravity nei propri dati locali."}
             </p>
-            <div className="flex flex-col items-center gap-2 mt-4">
-              <Button
-                onClick={handleInstallOrUpdate}
-                disabled={installing}
-                size="default"
-                className="gap-2 px-6 text-xs font-medium shadow-sm transition-all"
-              >
-                {installing ? (
-                  <>
-                    <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
-                    Download in corso...
-                  </>
-                ) : (
-                  <>
-                    <HugeiconsIcon icon={Download01Icon} size={15} strokeWidth={2} />
-                    Installa ora
-                  </>
-                )}
-              </Button>
-            </div>
+
+            {installing && (
+              <div className="w-full max-w-[280px] flex flex-col gap-2">
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden border border-border/40">
+                  <div
+                    className="bg-primary h-full transition-all duration-200 ease-out"
+                    style={{ width: `${Math.max(5, Math.min(100, downloadProgress?.percentage ?? 10))}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground font-mono">
+                  <span>{downloadProgress?.phase === "installing" ? "Installazione in corso..." : `${(downloadProgress?.percentage ?? 0).toFixed(0)}%`}</span>
+                  <span>
+                    {downloadProgress
+                      ? `${(downloadProgress.downloaded / (1024 * 1024)).toFixed(1)} MB` +
+                        (downloadProgress.total ? ` / ${(downloadProgress.total / (1024 * 1024)).toFixed(1)} MB` : "")
+                      : "Preparazione..."}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!installing && (
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <Button
+                  onClick={handleInstallOrUpdate}
+                  size="default"
+                  className="gap-2 px-6 text-xs font-medium shadow-sm transition-all"
+                >
+                  <HugeiconsIcon icon={Download01Icon} size={15} strokeWidth={2} />
+                  Installa ora
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Loading / Starting State */}
-        {!checking && !error && status?.installed && !isReady && (
+        {!checking && !error && status?.installed && !isReady && !installing && (
           <div className="flex h-full flex-col items-center justify-center p-6 text-center">
             <div className="mb-5 flex size-14 items-center justify-center">
               <img

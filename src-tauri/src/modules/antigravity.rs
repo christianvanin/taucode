@@ -571,6 +571,25 @@ fn patch_ipc_identifiers(body: &str) -> String {
     String::from_utf8(out_bytes).unwrap_or_else(|_| body.to_string())
 }
 
+fn connect_to_backend(port: u16, max_retries: u32, retry_delay_ms: u64) -> std::io::Result<TcpStream> {
+    let addr = format!("127.0.0.1:{}", port);
+    for i in 0..max_retries {
+        match TcpStream::connect(&addr) {
+            Ok(s) => {
+                let _ = s.set_nodelay(true);
+                return Ok(s);
+            }
+            Err(e) => {
+                if i + 1 >= max_retries {
+                    return Err(e);
+                }
+                std::thread::sleep(Duration::from_millis(retry_delay_ms));
+            }
+        }
+    }
+    TcpStream::connect(&addr)
+}
+
 fn fetch_and_patch_main_js() -> std::io::Result<Arc<Vec<u8>>> {
     if let Ok(guard) = CACHED_MAIN_JS.lock() {
         if let Some(ref cached) = *guard {
@@ -578,7 +597,7 @@ fn fetch_and_patch_main_js() -> std::io::Result<Arc<Vec<u8>>> {
         }
     }
 
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", BACKEND_PORT))?;
+    let mut stream = connect_to_backend(BACKEND_PORT, 20, 150)?;
     let req = format!(
         "GET /main.js HTTP/1.1\r\n\
          Host: 127.0.0.1:{}\r\n\
@@ -679,6 +698,21 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
         if initial_buf.windows(4).any(|w| w == b"\r\n\r\n") || initial_buf.len() >= 65536 {
             break;
         }
+    }
+
+    // Health-check dell'IDE: verifica sia il proxy sia il backend
+    if initial_buf.starts_with(b"GET /api/health") {
+        let backend_up = std::net::TcpStream::connect(format!("127.0.0.1:{}", BACKEND_PORT)).is_ok();
+        if backend_up {
+            let resp = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{\"ok\":true,\"backend\":true}\n";
+            let _ = client_stream.write_all(resp);
+            let _ = client_stream.flush();
+        } else {
+            let resp = b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{\"ok\":false,\"backend\":false}\n";
+            let _ = client_stream.write_all(resp);
+            let _ = client_stream.flush();
+        }
+        return Ok(());
     }
 
     // Gestione CORS Preflight OPTIONS per tutte le API (/api/terminal, /api/tabs, /api/git, ecc.)
@@ -1440,7 +1474,16 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
         let mut send_buf = new_headers.join("\r\n").into_bytes();
         send_buf.extend_from_slice(rest);
 
-        let mut backend = TcpStream::connect(format!("127.0.0.1:{}", BACKEND_PORT))?;
+        let mut backend = match connect_to_backend(BACKEND_PORT, 20, 150) {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!("[AntigravityProxy] WebSocket backend connect failed: {}", e);
+                let err_resp = b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\nBackend Antigravity offline";
+                let _ = client_stream.write_all(err_resp);
+                let _ = client_stream.flush();
+                return Ok(());
+            }
+        };
         backend.write_all(&send_buf)?;
         backend.flush()?;
 
@@ -1505,7 +1548,16 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
     let mut send_buf = new_headers.join("\r\n").into_bytes();
     send_buf.extend_from_slice(body_part);
 
-    let mut backend = TcpStream::connect(format!("127.0.0.1:{}", BACKEND_PORT))?;
+    let mut backend = match connect_to_backend(BACKEND_PORT, 20, 150) {
+        Ok(b) => b,
+        Err(e) => {
+            log::error!("[AntigravityProxy] HTTP backend connect failed: {}", e);
+            let body = b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: text/plain; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\nMotore Antigravity non pronto o in fase di avvio\n";
+            let _ = client_stream.write_all(body);
+            let _ = client_stream.flush();
+            return Ok(());
+        }
+    };
     backend.write_all(&send_buf)?;
 
     let body_read_so_far = body_part.len();
@@ -1640,15 +1692,16 @@ pub async fn start_antigravity_backend(
         *guard = None;
     }
 
-    let mut cmd = Command::new(agy_path);
+    let private_dir = get_antigravity_private_dir(&app)
+        .map_err(|e| format!("Cartella privata Antigravity non accessibile: {e}"))?;
+
+    let mut cmd = Command::new(&agy_path);
+    cmd.current_dir(&private_dir);
     cmd.arg("--hub")
        .arg(format!("--hub-port={}", BACKEND_PORT))
-       .arg("--app_data_dir=antigravity")
+       .arg(format!("--app_data_dir={}", private_dir.display()))
        .env("AGY_ENABLE_HUB", "1")
-       .env("ANTIGRAVITY_VSCODE_HOST", "1")
-       .stdin(std::process::Stdio::null())
-       .stdout(std::process::Stdio::null())
-       .stderr(std::process::Stdio::null());
+       .env("ANTIGRAVITY_VSCODE_HOST", "1");
 
     if let Some(ref root) = norm_workspace {
         cmd.arg(format!("--add-dir={}", root));
@@ -1657,7 +1710,30 @@ pub async fn start_antigravity_backend(
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
-    let child = cmd.spawn().map_err(|e| e.to_string())?;
+    let log_file_path = private_dir.join("antigravity-hub.log");
+    if let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_file_path)
+    {
+        if let Ok(err_file) = file.try_clone() {
+            cmd.stdout(std::process::Stdio::from(file));
+            cmd.stderr(std::process::Stdio::from(err_file));
+        }
+    } else {
+        cmd.stdout(std::process::Stdio::null());
+        cmd.stderr(std::process::Stdio::null());
+    }
+    cmd.stdin(std::process::Stdio::null());
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&agy_path, std::fs::Permissions::from_mode(0o755));
+    }
+
+    let child = cmd.spawn().map_err(|e| format!("Errore spawn Antigravity backend ({:?}): {e}", agy_path))?;
     lock.child = Some(child);
     lock.current_workspace = norm_workspace;
 
