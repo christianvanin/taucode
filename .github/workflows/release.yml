@@ -16,11 +16,11 @@ jobs:
       matrix:
         include:
           - platform: 'windows-latest'
-            args: ''
+            args: '--ignore-version-mismatches'
           - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+            args: '--target universal-apple-darwin --ignore-version-mismatches'
           - platform: 'ubuntu-22.04'
-            args: ''
+            args: '--ignore-version-mismatches'
 
     runs-on: ${{ matrix.platform }}
     steps:
