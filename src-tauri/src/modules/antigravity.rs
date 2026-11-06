@@ -1498,7 +1498,7 @@ fn handle_proxy_client(mut client_stream: TcpStream) -> std::io::Result<()> {
         });
         let t2 = std::thread::spawn(move || {
             let _ = std::io::copy(&mut backend_read, &mut client_write);
-            let _ = client_write.shutdown(std::net::Shutdown::Both);
+            // socket will close gracefully on drop without TCP RST
         });
         let _ = t1.join();
         let _ = t2.join();
@@ -1589,34 +1589,34 @@ fn start_proxy_listener() {
         return;
     }
 
-    std::thread::spawn(|| {
-        let addr = format!("127.0.0.1:{}", PROXY_PORT);
-        let mut bound_listener = None;
+    let addr = format!("127.0.0.1:{}", PROXY_PORT);
+    let mut bound_listener = None;
 
-        for _ in 0..15 {
-            match TcpListener::bind(&addr) {
-                Ok(l) => {
-                    bound_listener = Some(l);
-                    break;
-                }
-                Err(e) => {
-                    log::warn!("[AntigravityProxy] Retry bind {}: {}", addr, e);
-                    std::thread::sleep(Duration::from_millis(200));
-                }
+    for _ in 0..20 {
+        match TcpListener::bind(&addr) {
+            Ok(l) => {
+                bound_listener = Some(l);
+                break;
+            }
+            Err(e) => {
+                log::warn!("[AntigravityProxy] Retry bind {}: {}", addr, e);
+                std::thread::sleep(Duration::from_millis(100));
             }
         }
+    }
 
-        let listener = match bound_listener {
-            Some(l) => l,
-            None => {
-                log::error!("[AntigravityProxy] Failed to bind {} after retries", addr);
-                PROXY_RUNNING.store(false, Ordering::SeqCst);
-                return;
-            }
-        };
+    let listener = match bound_listener {
+        Some(l) => l,
+        None => {
+            log::error!("[AntigravityProxy] Failed to bind {} after retries", addr);
+            PROXY_RUNNING.store(false, Ordering::SeqCst);
+            return;
+        }
+    };
 
-        log::info!("[AntigravityProxy] Listening on http://{}", addr);
+    log::info!("[AntigravityProxy] Listening on http://{}", addr);
 
+    std::thread::spawn(move || {
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
@@ -1625,7 +1625,10 @@ fn start_proxy_listener() {
                     });
                 }
                 Err(e) => {
-                    log::warn!("[AntigravityProxy] Accept warning: {}", e);
+                    let err_str = e.to_string();
+                    if !err_str.contains("forcibly closed") && !err_str.contains("reset by peer") {
+                        log::warn!("[AntigravityProxy] Accept warning: {}", e);
+                    }
                     std::thread::sleep(Duration::from_millis(50));
                 }
             }

@@ -234,7 +234,11 @@ function AntigravityPaneComponent({
         if (res.ok) {
           const data = (await res.json().catch(() => null)) as { ok?: boolean; backend?: boolean } | null;
           if (data?.backend) {
-            return true;
+            const rootRes = await fetch("http://127.0.0.1:8085/", { cache: "no-store", method: "GET" }).catch(() => null);
+            if (rootRes && rootRes.ok) {
+              await new Promise((r) => setTimeout(r, 200));
+              return true;
+            }
           }
         }
       } catch {
@@ -834,7 +838,7 @@ function AntigravityPaneComponent({
     ? `file:///${workspaceRoot.replace(/\\/g, "/")}`
     : "";
 
-  const route = targetRoute ? `/${targetRoute.replace(/^\//, "")}` : "";
+  const route = targetRoute ? `/${targetRoute.replace(/^\//, "")}` : "/";
   const effectiveScreen = initialTargetScreenRef.current || (targetRoute?.includes("settings-standalone") ? "General" : undefined);
   const extraScreenParam = effectiveScreen ? `&targetScreen=${encodeURIComponent(effectiveScreen)}` : "";
 
@@ -972,7 +976,22 @@ function AntigravityPaneComponent({
 
         {/* Active Iframe */}
         {!checking && !error && isReady && (
-          <div className="relative flex-1 w-full h-full min-h-0 bg-background overflow-hidden overscroll-contain">
+          <div className="relative flex-1 w-full h-full min-h-0 bg-background overflow-hidden overscroll-contain group">
+            {/* Controlli rapidi overlay per ricarica immediata */}
+            <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-background/80 backdrop-blur-md p-1 rounded-md border border-border shadow-sm">
+              <button
+                type="button"
+                title="Ricarica pannello Antigravity"
+                onClick={() => {
+                  setReloadKey((k) => k + 1);
+                  setIframeLoaded(false);
+                  void startBackend();
+                }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <HugeiconsIcon icon={Refresh01Icon} size={14} />
+              </button>
+            </div>
             {!iframeLoaded && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
                 <HugeiconsIcon icon={Loading03Icon} size={22} className="animate-spin text-primary mb-2" />
