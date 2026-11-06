@@ -1,0 +1,908 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./fonts.css";
+@import "./code-highlight.css";
+
+@source "../../node_modules/streamdown/dist/index.js";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Inter Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0.005 240);
+    --card: oklch(0.966 0.003 240);
+    --card-foreground: oklch(0.145 0.005 240);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0.005 240);
+    --primary: oklch(0.205 0.01 240);
+    --primary-foreground: oklch(0.985 0.002 240);
+    --secondary: oklch(0.932 0.005 240);
+    --secondary-foreground: oklch(0.205 0.01 240);
+    --muted: oklch(0.935 0.005 240);
+    --muted-foreground: oklch(0.46 0.018 240);
+    --accent: oklch(0.92 0.006 240);
+    --accent-foreground: oklch(0.145 0.005 240);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.875 0.006 240);
+    --input: oklch(0.875 0.006 240);
+    --ring: oklch(0.65 0.02 240);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.966 0.003 240);
+    --sidebar-foreground: oklch(0.145 0.005 240);
+    --sidebar-primary: oklch(0.205 0.01 240);
+    --sidebar-primary-foreground: oklch(0.985 0.002 240);
+    --sidebar-accent: oklch(0.92 0.006 240);
+    --sidebar-accent-foreground: oklch(0.145 0.005 240);
+    --sidebar-border: oklch(0.875 0.006 240);
+    --sidebar-ring: oklch(0.65 0.02 240);
+    --svg-checker-1: #ffffff;
+    --svg-checker-2: #e4e4e7;
+    --svg-artboard-bg: #ffffff;
+}
+
+.dark {
+    --background: oklch(0.148 0.004 228.8);
+    --foreground: oklch(0.987 0.002 197.1);
+    --card: oklch(0.218 0.008 223.9);
+    --card-foreground: oklch(0.987 0.002 197.1);
+    --popover: oklch(0.218 0.008 223.9);
+    --popover-foreground: oklch(0.987 0.002 197.1);
+    --primary: oklch(0.925 0.005 214.3);
+    --primary-foreground: oklch(0.218 0.008 223.9);
+    --secondary: oklch(0.275 0.011 216.9);
+    --secondary-foreground: oklch(0.987 0.002 197.1);
+    --muted: oklch(0.275 0.011 216.9);
+    --muted-foreground: oklch(0.723 0.014 214.4);
+    --accent: oklch(0.275 0.011 216.9);
+    --accent-foreground: oklch(0.987 0.002 197.1);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.56 0.021 213.5);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --sidebar: oklch(0.218 0.008 223.9);
+    --sidebar-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.275 0.011 216.9);
+    --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.56 0.021 213.5);
+    --svg-checker-1: #111114;
+    --svg-checker-2: #1c1c21;
+    --svg-artboard-bg: #111114;
+}
+
+.svg-checkerboard-pattern,
+.svg-checkerboard-light {
+  background-color: #ffffff;
+  background-image: repeating-conic-gradient(
+    #e4e4e7 0% 25%,
+    #ffffff 0% 50%
+  );
+  background-size: 16px 16px;
+  background-position: 0 0;
+}
+
+.svg-checkerboard-dark {
+  background-color: #111114;
+  background-image: repeating-conic-gradient(
+    #1c1c21 0% 25%,
+    #111114 0% 50%
+  );
+  background-size: 16px 16px;
+  background-position: 0 0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    overflow: hidden;
+    }
+  html, body, #root {
+    height: 100%;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+:root {
+  --terminal-background: var(--background);
+  --terminal-foreground: var(--foreground);
+  --terminal-cursor: var(--foreground);
+  --terminal-cursor-accent: var(--background);
+  --terminal-selection: var(--accent);
+  --terminal-ansi-black: #18181b;
+  --terminal-ansi-red: #ef4444;
+  --terminal-ansi-green: #22c55e;
+  --terminal-ansi-yellow: #eab308;
+  --terminal-ansi-blue: #3b82f6;
+  --terminal-ansi-magenta: #a855f7;
+  --terminal-ansi-cyan: #06b6d4;
+  --terminal-ansi-white: #e4e4e7;
+  --terminal-ansi-bright-black: #52525b;
+  --terminal-ansi-bright-red: #f87171;
+  --terminal-ansi-bright-green: #4ade80;
+  --terminal-ansi-bright-yellow: #facc15;
+  --terminal-ansi-bright-blue: #60a5fa;
+  --terminal-ansi-bright-magenta: #c084fc;
+  --terminal-ansi-bright-cyan: #22d3ee;
+  --terminal-ansi-bright-white: #fafafa;
+}
+
+:root {
+  --app-zoom: 0.9;
+  --editor-font-size: 12px;
+}
+
+html[data-chrome="borderless"] .terax-bg-surface {
+  border-radius: 12px;
+}
+.zoom-content {
+  zoom: var(--app-zoom);
+}
+.zoom-exempt {
+  zoom: calc(1 / var(--app-zoom));
+}
+
+/* Custom window chrome (Linux/Windows): the OS gives us a transparent
+ * borderless window, and we paint the rounded corners + border + shadow
+ * ourselves so the app doesn't look naked on GNOME/KDE/Hyprland. */
+html[data-chrome="borderless"],
+html[data-chrome="borderless"] body {
+  background: transparent !important;
+}
+html[data-chrome="borderless"] #root,
+html[data-chrome="borderless"] #settings-root {
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+html[data-chrome="borderless"][data-maximized="true"] #root,
+html[data-chrome="borderless"][data-maximized="true"] #settings-root,
+html[data-chrome="borderless"][data-maximized="true"] .terax-bg-surface {
+  border-radius: 0;
+  border: none;
+}
+
+/*
+ * xterm.js overrides — kept outside @layer so they win against the addon's
+ * own stylesheet (which is not in any layer and would otherwise override).
+ *
+ * Newer xterm renders scrollbars as real <div class="scrollbar vertical|horizontal">
+ * children rather than relying on native overflow scrollbars. Both code paths exist
+ * across versions, so we hide both.
+ */
+.xterm .scrollbar,
+.xterm .scrollbar.vertical,
+.xterm .scrollbar.horizontal {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+.xterm .xterm-viewport,
+.xterm-viewport {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar,
+.xterm-viewport::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+.xterm,
+.xterm-screen,
+.xterm:focus,
+.xterm.focus {
+  outline: none !important;
+}
+
+.cm-editor,
+.cm-scroller {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.cm-editor::-webkit-scrollbar,
+.cm-scroller::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+[contenteditable="true"],
+.cm-editor,
+.select-text,
+.select-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.cm-color-swatch {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.35em;
+  border-radius: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  vertical-align: middle;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.cm-color-swatch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+.no-scrollbar-deep,
+.no-scrollbar-deep * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar-deep::-webkit-scrollbar,
+.no-scrollbar-deep *::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Kill native scrollbars everywhere by default — Linux/Windows ship chunky
+ * Chromium bars that break the chrome, and macOS WKWebView flashes its overlay
+ * scrollbar briefly during layout transitions (AI panel open, pane split,
+ * window resize) which looks like a glitch. Visible scroll affordances are
+ * provided per-region via shadcn <ScrollArea>. */
+html,
+html *,
+html *::before,
+html *::after {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Motion tokens. Reduced-motion zeroes the durations as a global snap. */
+:root {
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 320ms;
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes terax-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes terax-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.terax-collapsible-content {
+  overflow: hidden;
+}
+.terax-collapsible-content[data-state="open"] {
+  animation: terax-collapsible-down var(--dur-base) var(--ease-soft);
+}
+.terax-collapsible-content[data-state="closed"] {
+  animation: terax-collapsible-up var(--dur-base) var(--ease-soft);
+}
+
+/* Height auto<->0 reveal without JS measuring: animate the grid track from 0fr
+ * to 1fr. The inner child must be the sole grid row with min-height:0. Used by
+ * the docked AI input bar and the composer voice-status row. */
+.terax-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows var(--dur-base) var(--ease-premium),
+    opacity var(--dur-base) var(--ease-premium);
+  opacity: 0;
+}
+.terax-reveal[data-state="open"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.terax-reveal > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@keyframes terax-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.terax-panel-in {
+  animation: terax-panel-in var(--dur-slow) var(--ease-premium);
+}
+
+@keyframes terax-tab-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.terax-tab-in {
+  animation: terax-tab-in var(--dur-base) var(--ease-premium);
+}
+
+@keyframes terax-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.terax-pill-in {
+  animation: terax-pill-in var(--dur-base) var(--ease-premium);
+}
+
+/* Text shimmer loop (replaces motion background-position animation). Driven by
+ * --shimmer-duration / --shimmer-spread set inline per instance. */
+@keyframes terax-shimmer {
+  from {
+    background-position: 100% center;
+  }
+  to {
+    background-position: 0% center;
+  }
+}
+.terax-shimmer {
+  background-repeat: no-repeat, padding-box;
+  background-size:
+    250% 100%,
+    auto;
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent calc(50% - var(--shimmer-spread)),
+      var(--color-background),
+      transparent calc(50% + var(--shimmer-spread))
+    ),
+    linear-gradient(
+      var(--color-muted-foreground),
+      var(--color-muted-foreground)
+    );
+  animation: terax-shimmer var(--shimmer-duration, 2s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+  }
+  .terax-reveal {
+    transition: none;
+  }
+  .terax-shimmer {
+    animation: none;
+    background-position: 0% center;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Monaco Editor Find Widget & Hover Tooltip Theming
+ * -------------------------------------------------------------------------- */
+
+.monaco-editor .find-widget {
+  background-color: var(--color-card) !important;
+  color: var(--color-card-foreground) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  right: 18px !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+.monaco-editor .find-widget.visible {
+  top: 38px !important;
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.monaco-editor .find-widget:not(.visible) {
+  top: -120px !important;
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.monaco-editor .find-widget .monaco-inputbox {
+  background-color: var(--color-background) !important;
+  border: 1px solid var(--color-input) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.monaco-editor .find-widget .monaco-inputbox input,
+.monaco-editor .find-widget .monaco-inputbox .input {
+  color: var(--color-foreground) !important;
+  background-color: transparent !important;
+}
+
+.monaco-editor .find-widget .monaco-inputbox input::placeholder,
+.monaco-editor .find-widget .monaco-inputbox .input::placeholder {
+  color: var(--color-muted-foreground) !important;
+}
+
+.monaco-editor .find-widget .button {
+  color: var(--color-muted-foreground) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.monaco-editor .find-widget .button:hover {
+  background-color: var(--color-accent) !important;
+  color: var(--color-accent-foreground) !important;
+}
+
+.monaco-editor .find-widget .monaco-custom-checkbox {
+  color: var(--color-muted-foreground) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.monaco-editor .find-widget .monaco-custom-checkbox.checked {
+  background-color: var(--color-accent) !important;
+  color: var(--color-accent-foreground) !important;
+  border-color: var(--color-ring) !important;
+}
+
+.monaco-editor .find-widget .matchesCount {
+  color: var(--color-muted-foreground) !important;
+}
+
+/* ==========================================================================
+   Monaco Hover Popover (Translations, Code Docs, Info)
+   ========================================================================== */
+
+/* Find widget tooltips only */
+.monaco-editor .find-widget .monaco-hover,
+.find-widget .monaco-hover {
+  pointer-events: none !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  border-radius: 4px !important;
+}
+
+
+
+/* ==========================================================================
+   Monaco Find Widget Tooltips
+   ========================================================================== */
+
+/* Hide shortcut keybindings in find widget tooltips */
+.find-widget .monaco-hover .keybinding,
+.find-widget .monaco-hover-content .keybinding {
+  display: none !important;
+}
+
+
+/* ==========================================================================
+   Monaco Editor LSP Hover / Error Tooltip Customization
+   ========================================================================== */
+
+/* ==========================================================================
+   Monaco Editor Hover Theming (Matching Translation Widget)
+   ========================================================================== */
+
+/* Completely hide native Monaco hovers when our custom Terax widget is visible */
+.terax-suppress-native-hover .monaco-hover,
+.terax-suppress-native-hover .monaco-editor-hover {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Instead of hiding the native hover, we style it to match the custom widget */
+.monaco-editor-hover,
+.monaco-hover {
+  background: rgba(var(--color-popover-rgb, 255, 255, 255), 0.95) !important;
+  color: var(--color-popover-foreground) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  animation: teraxFadeIn 0.15s ease-out !important;
+}
+
+/* Ensure inner container doesn't override the rounded corners with sharp backgrounds */
+.monaco-editor-hover .monaco-hover,
+.monaco-editor .monaco-hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.monaco-editor .monaco-hover-content {
+  background: transparent !important;
+}
+
+/* Hide native marker hovers ONLY when they are pure markers, but be careful not to hide LSP docs!
+   Actually, we handle marker hiding in JS if needed. */
+
+
+
+/* Scrollable Container inside Hover */
+.monaco-editor .monaco-hover .monaco-hover-content,
+.monaco-hover .monaco-hover-content,
+.monaco-editor .monaco-hover .monaco-scrollable-element,
+.monaco-hover .monaco-scrollable-element {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--color-popover-foreground, var(--foreground, #f4f4f5)) !important;
+  font-family: var(--font-sans, 'Inter Variable', sans-serif) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  padding: 0 !important;
+}
+
+/* Hide raw chunky scrollbars inside hover */
+.monaco-hover .monaco-scrollable-element > .scrollbar {
+  display: none !important;
+}
+
+/* Hover Rows (Content sections) */
+.monaco-editor .monaco-hover .hover-row,
+.monaco-hover .hover-row {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--color-foreground, #f4f4f5) !important;
+  box-sizing: border-box !important;
+}
+
+.monaco-editor .monaco-hover .hover-row:not(.status-bar),
+.monaco-hover .hover-row:not(.status-bar) {
+  padding: 10px 14px !important;
+}
+
+.monaco-editor .monaco-hover .hover-row:not(:first-child):not(.status-bar),
+.monaco-hover .hover-row:not(:first-child):not(.status-bar) {
+  border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08)) !important;
+}
+
+/* Diagnostics & Marker Content (Errors, Warnings, Hints) */
+.monaco-hover .marker-hover {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.monaco-hover .marker-hover .description {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: var(--color-foreground, #f4f4f5) !important;
+  font-weight: 450 !important;
+  word-break: break-word !important;
+}
+
+.monaco-hover .marker-hover .marker-message {
+  font-family: var(--font-sans, 'Inter Variable', sans-serif) !important;
+  font-weight: 500 !important;
+}
+
+/* Diagnostic Source & Rule Name (e.g. Pyright(reportCallIssue)) */
+.monaco-hover .marker-hover .source,
+.monaco-hover .marker-hover .marker-source,
+.monaco-hover .marker-hover .code,
+.monaco-hover .marker-hover .marker-code,
+.monaco-hover .marker-hover span:not(.marker-message):not(.marker-hover-message) {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: 6px !important;
+  padding: 1.5px 6px !important;
+  font-size: 11px !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-weight: 500 !important;
+  color: var(--color-muted-foreground) !important;
+  background-color: var(--color-muted) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 5px !important;
+  vertical-align: middle !important;
+}
+
+/* Markdown Documentation & Typography */
+.monaco-editor .monaco-hover p,
+.monaco-hover p {
+  font-family: var(--font-sans, "Inter Variable", sans-serif) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  margin: 4px 0 !important;
+  color: var(--color-foreground) !important;
+}
+
+.monaco-editor .monaco-hover code,
+.monaco-hover code {
+  font-family: "JetBrains Mono", "Cascadia Code", monospace !important;
+  font-size: 12px !important;
+  background-color: var(--color-muted) !important;
+  color: var(--color-foreground) !important;
+  padding: 2px 5px !important;
+  border-radius: 4px !important;
+}
+
+.monaco-editor .monaco-hover pre,
+.monaco-hover pre {
+  background-color: color-mix(in srgb, var(--color-muted) 45%, var(--color-card)) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  margin: 6px 0 !important;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.monaco-editor .monaco-hover pre code,
+.monaco-hover pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.monaco-editor .monaco-hover .monaco-tokenized-source,
+.monaco-hover .monaco-tokenized-source {
+  font-family: "JetBrains Mono", "Cascadia Code", monospace !important;
+  font-size: 12.5px !important;
+}
+
+.monaco-editor .monaco-hover a,
+.monaco-hover a {
+  color: var(--color-primary) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+/* Status Bar & Action Footer (View Problem, Quick Fixes) */
+.monaco-editor .monaco-hover .hover-row.status-bar,
+.monaco-hover .hover-row.status-bar,
+.monaco-hover .status-bar,
+.monaco-hover .marker-hover-status-bar {
+  background-color: color-mix(in srgb, var(--color-muted) 35%, var(--color-popover)) !important;
+  border-top: 1px solid var(--color-border) !important;
+  padding: 6px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 32px !important;
+  box-sizing: border-box !important;
+}
+
+.monaco-hover .actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.monaco-hover .action-item {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Action Links / Buttons (e.g. "View Problem (Alt+F8)", "Quick Fix...") */
+.monaco-hover .action-label,
+.monaco-hover a.action-label,
+.monaco-hover .action-item a {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  color: var(--color-primary) !important;
+  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+.monaco-hover a.action-label:hover,
+.monaco-hover .action-item a:hover {
+  background-color: var(--color-primary) !important;
+  color: var(--color-primary-foreground) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Disabled or Secondary Labels in Status Bar (e.g. "No quick fixes available") */
+.monaco-hover .action-label.disabled,
+.monaco-hover span.action-label:not(a) {
+  color: var(--color-muted-foreground) !important;
+  background: transparent !important;
+  border: none !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  opacity: 0.8 !important;
+  cursor: default !important;
+  padding: 2px 4px !important;
+}
+
+/* Autocomplete Suggest Widget */
+.monaco-editor .suggest-widget {
+  background-color: var(--color-popover) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  overflow: hidden !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list-row {
+  font-size: 12.5px !important;
+  border-radius: 6px !important;
+}
+
+.monaco-editor .suggest-widget .monaco-list-row.focused {
+  background-color: var(--color-accent) !important;
+  color: var(--color-accent-foreground) !important;
+}
+
+/* Parameter Hints / Signature Helper */
+.monaco-editor .parameter-hints-widget {
+  background-color: var(--color-popover) !important;
+  color: var(--color-popover-foreground) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.25) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  padding: 8px 12px !important;
+  font-size: 12.5px !important;
+}
+
+/* Inline Marker Widget (Alt+F8 Peek Problem) */
+.monaco-editor .zone-widget.marker-widget {
+  background-color: var(--color-popover) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.2) !important;
+  overflow: hidden !important;
+}
+
+.monaco-editor .marker-widget .head {
+  background-color: color-mix(in srgb, var(--color-muted) 40%, var(--color-popover)) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  color: var(--color-foreground) !important;
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.monaco-editor .marker-widget .body {
+  background-color: var(--color-popover) !important;
+  color: var(--color-foreground) !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+

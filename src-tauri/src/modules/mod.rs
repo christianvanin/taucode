@@ -1,0 +1,12 @@
+pub mod fs;
+pub mod git;
+pub mod history;
+pub mod lsp;
+pub mod proc;
+pub mod pty;
+pub mod secrets;
+pub mod shell;
+pub mod workspace;
+pub mod antigravity;
+pub mod extensions;
+pub mod builtin_skills;

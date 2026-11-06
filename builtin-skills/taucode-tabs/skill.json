@@ -1,0 +1,13 @@
+{
+  "name": "taucode-tabs",
+  "version": "1.2.0",
+  "folder": "Built-in",
+  "description": "Complete tab management and visual inspection in TauCode IDE, screenshot capture, and terminal output monitoring.",
+  "scripts": {
+    "run": "node scripts/tabs.cjs",
+    "list": "node scripts/tabs.cjs list",
+    "types": "node scripts/tabs.cjs types",
+    "screenshot": "node scripts/tabs.cjs screenshot",
+    "terminal-output": "node scripts/tabs.cjs terminal-output"
+  }
+}

@@ -1,0 +1,41 @@
+TauCode Custom License
+Version 1.0, 2026
+
+Copyright (c) 2026 Crynta and TauCode Contributors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, and distribute copies of the Software,
+subject to the following conditions:
+
+1. NON-COMMERCIAL USE AND REDISTRIBUTION
+   The Software may be used, modified, and redistributed for personal, educational,
+   research, and other non-commercial purposes, provided that:
+   (a) The above copyright notice and this permission notice appear in all copies
+       or substantial portions of the Software.
+   (b) Any redistributed version or modified derivative work MUST NOT use the name
+       "TauCode", the official TauCode logos, or branding marks in a way that suggests
+       endorsement or official affiliation. All trademarks, names, and logos must be
+       clearly changed and rebranded.
+
+2. COMMERCIAL USE
+   (a) Permitted Indirect Commercial Use: Using TauCode as an end-user developer tool,
+       integrated development environment (IDE), or editor to write, test, build,
+       and deploy proprietary, open-source, or commercial software applications within
+       any business, organization, or enterprise is PERMITTED without restriction,
+       fee, or royalty.
+   (b) Restricted Direct Commercial Exploitation: Selling, sublicensing, leasing,
+       offering as a commercial hosted service (SaaS), or otherwise directly monetizing
+       the Software or any derivative work thereof is strictly prohibited without a
+       separate, explicit commercial license granted in writing by Crynta.
+
+3. DISCLAIMER OF WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+

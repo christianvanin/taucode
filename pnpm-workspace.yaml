@@ -1,0 +1,7 @@
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: true
+allowBuilds:
+  core-js: true
+  esbuild: true
+  msgpackr-extract: false
+  msw: true

@@ -1,0 +1,11 @@
+{
+  "name": "skill-builder",
+  "folder": "Built-in",
+  "description": "Creates, designs, scaffolds, structures, optimizes, and validates new modular skills for Antigravity and TauCode.",
+  "scripts": {
+    "run": "python scripts/run.py",
+    "init": "python scripts/init_skill.py",
+    "validate": "python scripts/validate_skill.py",
+    "package": "python scripts/package_skill.py"
+  }
+}
