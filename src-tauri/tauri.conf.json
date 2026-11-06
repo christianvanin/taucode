@@ -157,7 +157,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDMzZGNzFBMkQ4Mjc4OTkKUldTWmVJSXRHdmMyN0JWYmNielViWTlMMExpL01HZVQyY0FQV0Q1bnNPcHkzYS9MdmZ4SFBEOW8K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4MDRDRDBBRjUxNjVDREMKUldUY1hCYjFDczBFK0dFQUt4TG5WbVJHM3hwWWpwNFBhTTU2RTNQczdJYzViTFFVK3AyTXhtYzIK",
       "endpoints": [
         "https://github.com/christianvanin/taucode/releases/latest/download/latest.json"
       ],
