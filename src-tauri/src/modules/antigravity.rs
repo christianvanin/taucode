@@ -1699,7 +1699,7 @@ pub async fn start_antigravity_backend(
     cmd.current_dir(&private_dir);
     cmd.arg("--hub")
        .arg(format!("--hub-port={}", BACKEND_PORT))
-       .arg(format!("--app_data_dir={}", private_dir.display()))
+       .arg("--app_data_dir=antigravity")
        .env("AGY_ENABLE_HUB", "1")
        .env("ANTIGRAVITY_VSCODE_HOST", "1");
 
@@ -1733,7 +1733,19 @@ pub async fn start_antigravity_backend(
         let _ = std::fs::set_permissions(&agy_path, std::fs::Permissions::from_mode(0o755));
     }
 
-    let child = cmd.spawn().map_err(|e| format!("Errore spawn Antigravity backend ({:?}): {e}", agy_path))?;
+    let mut child = cmd.spawn().map_err(|e| format!("Errore spawn Antigravity backend ({:?}): {e}", agy_path))?;
+
+    // Attendi 200ms per verificare che il processo non sia crashato subito all'avvio
+    std::thread::sleep(Duration::from_millis(200));
+    if let Ok(Some(status)) = child.try_wait() {
+        let err_log = std::fs::read_to_string(&log_file_path).unwrap_or_default();
+        let last_lines: Vec<&str> = err_log.lines().rev().take(6).collect();
+        return Err(format!(
+            "Processo Antigravity terminato all'avvio (status: {status}): {}",
+            last_lines.into_iter().rev().collect::<Vec<_>>().join(" ")
+        ));
+    }
+
     lock.child = Some(child);
     lock.current_workspace = norm_workspace;
 

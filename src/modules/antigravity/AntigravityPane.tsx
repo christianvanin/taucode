@@ -227,7 +227,7 @@ function AntigravityPaneComponent({
   }, []);
 
   // Health-check loop: attende che il server risponda su http://127.0.0.1:8085/api/health
-  const waitForBackend = useCallback(async (maxRetries = 80): Promise<boolean> => {
+  const waitForBackend = useCallback(async (maxRetries = 40): Promise<boolean> => {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const res = await fetch("http://127.0.0.1:8085/api/health", { cache: "no-store" });
@@ -240,7 +240,7 @@ function AntigravityPaneComponent({
       } catch {
         // Attende che sia il proxy sia il backend completino il binding
       }
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 200));
     }
     return false;
   }, []);
