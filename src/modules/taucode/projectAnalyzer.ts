@@ -156,6 +156,8 @@ export async function detectProjectType(rootPath: string): Promise<ProjectType> 
 }
 
 export interface ProjectTemplates {
+  compileCmd?: string;
+  runCmd?: string;
   compileSh: string;
   compileBat: string;
   runSh: string;
@@ -273,6 +275,8 @@ export function getTemplatesForProject(type: ProjectType): ProjectTemplates {
   }
 
   return {
+    compileCmd,
+    runCmd,
     compileSh: `#!/usr/bin/env bash\necho "==> [TauCode] Compiling project..."\n${compileCmd}\necho "==> [TauCode] Compilation completed."\n`,
     compileBat: `@echo off\necho ==^> [TauCode] Compiling project...\n${compileCmd}\necho ==^> [TauCode] Compilation completed.\n`,
     runSh: `#!/usr/bin/env bash\necho "==> [TauCode] Running project..."\n${runCmd}\n`,

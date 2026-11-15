@@ -66,11 +66,9 @@ import {
   useWorkspaceCwd,
 } from "@/modules/tabs";
 import { DEFAULT_SPACE_ID } from "@/modules/tabs/lib/useTabs";
-import type { TerminalTab } from "@/modules/tabs";
+import type { EditorTab, TerminalTab } from "@/modules/tabs";
 import {
-  ensureTauCodeStructure,
-  readTauCodeConfig,
-  buildScriptCommand,
+  resolveExecutableCommand,
   type TauCodeActionType,
 } from "@/modules/taucode";
 import { ExtensionRegistry } from "@/modules/extensions/ExtensionRegistry";
@@ -271,6 +269,23 @@ export default function App() {
       const switched = await switchWorkspace(env);
       if (switched && activeSpaceId) {
         useSpaces.getState().setEnv(activeSpaceId, env);
+        const current = useSpaces
+          .getState()
+          .spaces.find((s) => s.id === activeSpaceId);
+        if (current) {
+          const isWinDrive = current.root
+            ? /^[a-zA-Z]:[\\/]/.test(current.root.replace(/^\//, ""))
+            : false;
+
+          if (env.kind === "local") {
+            // When switching to Windows: if current root was a Linux path (like "/" or "/root/..."),
+            // reset root to null and rename to "Default" because Linux paths don't exist in local Windows.
+            if (current.root && !isWinDrive) {
+              useSpaces.getState().setRoot(activeSpaceId, null);
+              useSpaces.getState().rename(activeSpaceId, "Default");
+            }
+          }
+        }
       }
     },
     [switchWorkspace, activeSpaceId],
@@ -467,6 +482,7 @@ export default function App() {
     activeSpace?.root ?? null,
     activeTab,
     launchCwd ?? home,
+    workspaceEnv,
   );
 
   useWindowTitle(activeTab, explorerRoot);
@@ -490,11 +506,15 @@ export default function App() {
 
   const disposeTab = useCallback(
     (id: number) => {
+      const tabToClose = tabsRef.current.find((t) => t.id === id);
+      if (tabToClose?.kind === "editor" && (tabToClose as EditorTab).isTemporary) {
+        invoke("fs_cleanup_temp_file", { path: tabToClose.path }).catch(() => {});
+      }
       editorRefs.current.delete(id);
       previewRefs.current.delete(id);
       closeTab(id);
     },
-    [closeTab],
+    [closeTab, tabsRef],
   );
 
   const {
@@ -583,10 +603,15 @@ export default function App() {
       if (activeLeafId === null) return;
       const term = terminalRefs.current.get(activeLeafId);
       if (!term) return;
-      term.write(`cd ${quoteShellArg(path)}\r`);
+      const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(path.replace(/^\//, ""));
+      if (workspaceEnv.kind === "wsl" && isWindowsDrive) {
+        term.write(`cd "$(wslpath -u ${quoteShellArg(path)})"\r`);
+      } else {
+        term.write(`cd ${quoteShellArg(path)}\r`);
+      }
       term.focus();
     },
-    [activeLeafId],
+    [activeLeafId, workspaceEnv.kind],
   );
 
   const cdInNewTab = useCallback(
@@ -597,11 +622,16 @@ export default function App() {
         if (!tab || tab.kind !== "terminal") return;
         const t = terminalRefs.current.get(tab.activeLeafId);
         if (!t) return;
-        t.write(`cd ${quoteShellArg(path)}\r`);
+        const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(path.replace(/^\//, ""));
+        if (workspaceEnv.kind === "wsl" && isWindowsDrive) {
+          t.write(`cd "$(wslpath -u ${quoteShellArg(path)})"\r`);
+        } else {
+          t.write(`cd ${quoteShellArg(path)}\r`);
+        }
         t.focus();
       }, 80);
     },
-    [newTab],
+    [newTab, workspaceEnv.kind],
   );
 
   const pendingGotoLine = useRef<Map<number, number>>(new Map());
@@ -646,6 +676,18 @@ export default function App() {
       }
     },
     [openFileTab, newMarkdownTab, newSvgTab, openExtensionTab, openContentHit],
+  );
+
+  const handlePromoteTemporary = useCallback(
+    (id: number, newPath: string, newTitle: string) => {
+      updateTab(id, {
+        path: newPath,
+        title: newTitle,
+        isTemporary: false,
+        dirty: false,
+      });
+    },
+    [updateTab],
   );
 
   useEffect(() => {
@@ -1581,7 +1623,7 @@ listen<{
     [focusPane],
   );
 
-  const handleOpenFolder = useCallback(async () => {
+  const openNativeFolderDialog = useCallback(async () => {
     const selected = await open({
       directory: true,
       multiple: false,
@@ -1593,10 +1635,78 @@ listen<{
       const folderName =
         normalized.split("/").filter(Boolean).pop() || "Folder";
       const { create, setActive } = useSpaces.getState();
-      const meta = create({ name: folderName, root: normalized });
+      const meta = create({ name: folderName, root: normalized, env: workspaceEnv });
       setActive(meta.id);
     }
-  }, []);
+  }, [workspaceEnv]);
+
+  const handleOpenFolder = useCallback(async () => {
+    if (workspaceEnv.kind === "wsl") {
+      const root = "/";
+      await native.workspaceAuthorize(root).catch(() => {});
+      const { spaces, activeId, setRoot, rename, create, setActive } =
+        useSpaces.getState();
+      const current = spaces.find((s) => s.id === activeId);
+      if (current) {
+        setRoot(current.id, root);
+        rename(current.id, `WSL (${workspaceEnv.distro})`);
+      } else {
+        const meta = create({
+          name: `WSL (${workspaceEnv.distro})`,
+          root,
+          env: workspaceEnv,
+        });
+        setActive(meta.id);
+      }
+      return;
+    }
+    await openNativeFolderDialog();
+  }, [workspaceEnv, openNativeFolderDialog]);
+
+  const handleSetProjectRoot = useCallback(
+    async (dirPath: string) => {
+      await native.workspaceAuthorize(dirPath).catch(() => {});
+      const normalized = dirPath.replace(/\\/g, "/");
+      const folderName =
+        normalized.split("/").filter(Boolean).pop() || "Folder";
+      const { spaces, activeId, setRoot, rename, create, setActive } =
+        useSpaces.getState();
+      const current = spaces.find((s) => s.id === activeId);
+      if (current) {
+        setRoot(current.id, normalized);
+        rename(current.id, folderName);
+      } else {
+        const meta = create({
+          name: folderName,
+          root: normalized,
+          env: workspaceEnv,
+        });
+        setActive(meta.id);
+      }
+      toast.success(`Cartella di progetto: ${folderName}`);
+    },
+    [workspaceEnv],
+  );
+
+  const handleBrowseWslRoot = useCallback(async () => {
+    if (workspaceEnv.kind !== "wsl") return;
+    const root = "/";
+    await native.workspaceAuthorize(root).catch(() => {});
+    const { spaces, activeId, setRoot, rename, create, setActive } =
+      useSpaces.getState();
+    const current = spaces.find((s) => s.id === activeId);
+    if (current) {
+      setRoot(current.id, root);
+      rename(current.id, `WSL (${workspaceEnv.distro})`);
+    } else {
+      const meta = create({
+        name: `WSL (${workspaceEnv.distro})`,
+        root,
+        env: workspaceEnv,
+      });
+      setActive(meta.id);
+    }
+  }, [workspaceEnv]);
 
   const handleCloseFolder = useCallback(() => {
     if (!activeSpaceId) return;
@@ -1708,32 +1818,133 @@ listen<{
     setActive(meta.id);
   }, []);
 
-  // Automatically ensure TauCode directory and files when a project folder is open (excluded for skill workspaces)
   const currentProjectRoot = activeSpace?.root ?? explorerRoot ?? null;
-  const isSkillProject = isSkillSpace || isSkillPath(currentProjectRoot);
-  useEffect(() => {
-    if (currentProjectRoot && !isSkillProject) {
-      void ensureTauCodeStructure(currentProjectRoot).then(() => {
-        // Force refresh explorer so TauCode folder appears immediately
-        explorerRef.current?.refresh();
-      });
-    }
-  }, [currentProjectRoot, isSkillProject]);
 
   const executeTauCodeAction = useCallback(
     async (type: TauCodeActionType) => {
       const projectRoot = activeSpace?.root ?? explorerRoot;
       if (!projectRoot) {
-        toast.error("Nessun progetto aperto. Apri una cartella per compilare o eseguire.");
+        const editorTab =
+          activeTab?.kind === "editor"
+            ? activeTab
+            : (spaceTabs.find((t): t is EditorTab => t.kind === "editor") ?? null);
+
+        if (editorTab) {
+          const handle = editorRefs.current.get(editorTab.id);
+          if (handle?.saveToDiskDirect) {
+            await handle.saveToDiskDirect();
+          } else if (handle?.save) {
+            await handle.save();
+          }
+
+          const filePath = editorTab.path;
+          const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+          const escapedPath = filePath.replace(/\//g, "\\");
+
+          let command: string;
+          if (type === "compile") {
+            switch (ext) {
+              case "rs":
+                command = `rustc "${escapedPath}"`;
+                break;
+              case "go":
+                command = `go build "${escapedPath}"`;
+                break;
+              case "ts":
+              case "mts":
+                command = `npx tsx "${escapedPath}"`;
+                break;
+              case "py":
+                command = `python -m py_compile "${escapedPath}"`;
+                break;
+              default:
+                command = `echo "Nessun compilatore necessario per .${ext}"`;
+                break;
+            }
+          } else {
+            switch (ext) {
+              case "py":
+              case "pyw":
+                command = `python "${escapedPath}"`;
+                break;
+              case "js":
+              case "mjs":
+              case "cjs":
+                command = `node "${escapedPath}"`;
+                break;
+              case "ts":
+              case "mts":
+              case "cts":
+                command = `npx tsx "${escapedPath}"`;
+                break;
+              case "ps1":
+                command = `powershell -ExecutionPolicy Bypass -File "${escapedPath}"`;
+                break;
+              case "sh":
+              case "bash":
+                command = `bash "${escapedPath}"`;
+                break;
+              case "bat":
+              case "cmd":
+                command = `cmd /c "${escapedPath}"`;
+                break;
+              case "go":
+                command = `go run "${escapedPath}"`;
+                break;
+              case "rs":
+                command = `rustc "${escapedPath}" -o "${escapedPath}.exe" && "${escapedPath}.exe"`;
+                break;
+              default:
+                command = `"${escapedPath}"`;
+                break;
+            }
+          }
+
+          const actionLabel = type === "compile" ? "Compilazione file" : "Esecuzione file";
+          toast.info(`${actionLabel} (${editorTab.title}): ${command}`);
+
+          const terminalTab =
+            activeTab?.kind === "terminal"
+              ? activeTab
+              : (spaceTabs.find((t): t is TerminalTab => t.kind === "terminal") ?? null);
+
+          const fullCommand = `${command}\r`;
+
+          if (terminalTab) {
+            setActiveId(terminalTab.id);
+            const leafId = terminalTab.activeLeafId;
+            const term = terminalRefs.current.get(leafId);
+            if (term) {
+              term.write(fullCommand);
+              term.focus();
+            } else {
+              writeToSession(leafId, fullCommand);
+            }
+          } else {
+            const tabId = newTab();
+            setTimeout(() => {
+              const tab = tabsRef.current.find((x) => x.id === tabId);
+              if (!tab || tab.kind !== "terminal") return;
+              const t = terminalRefs.current.get(tab.activeLeafId);
+              if (t) {
+                t.write(fullCommand);
+                t.focus();
+              } else {
+                writeToSession(tab.activeLeafId, fullCommand);
+              }
+            }, 150);
+          }
+          return;
+        }
+
+        toast.error("Nessun progetto o file aperto da compilare o eseguire.");
         return;
       }
       if (isSkillSpace || isSkillPath(projectRoot)) {
         return;
       }
 
-      await ensureTauCodeStructure(projectRoot);
-      const config = await readTauCodeConfig(projectRoot, type);
-      const command = buildScriptCommand(config ?? {}, type);
+      const command = await resolveExecutableCommand(projectRoot, type);
 
       const actionLabel = type === "compile" ? "Compilazione" : "Esecuzione";
       toast.info(`${actionLabel}: ${command}`);
@@ -1990,6 +2201,12 @@ listen<{
                         onRevealInTerminal={cdInNewTab}
                         onOpenFolder={handleOpenFolder}
                         onCloseFolder={handleCloseFolder}
+                        onSetProjectRoot={handleSetProjectRoot}
+                        onBrowseWsl={
+                          workspaceEnv.kind === "wsl"
+                            ? handleBrowseWslRoot
+                            : undefined
+                        }
                       />
                     ) : (
                       <SourceControlPanel
@@ -2035,7 +2252,9 @@ listen<{
                       onGitHistorySearchHandle={setGitHistoryHandle}
                       onSetMarkdownView={setMarkdownView}
                       onSetSvgView={setSvgView}
-                      workspaceRoot={explorerRoot ?? home}
+                      onPromoteTemporary={handlePromoteTemporary}
+                      workspaceRoot={currentProjectRoot}
+                      workspaceEnv={workspaceEnv}
                       onCloseTab={disposeTab}
                       onOpenAntigravitySettings={openAntigravitySettingsTab}
                       onOpenFile={handleOpenFile}
@@ -2064,7 +2283,8 @@ listen<{
                   >
                     <div className="flex h-full min-h-0 flex-col border-l border-border/60 bg-card">
                       <AntigravityPane
-                        workspaceRoot={explorerRoot ?? home}
+                        workspaceRoot={currentProjectRoot}
+                        workspaceEnv={workspaceEnv}
                         variant="panel"
                         onClose={closeAntigravitySidePanel}
                         onMoveToTab={handleMoveAntigravityToTab}
@@ -2131,8 +2351,8 @@ listen<{
           <NewEditorDialog
             open={newEditorOpen}
             onOpenChange={setNewEditorOpen}
-            rootPath={explorerRoot ?? home}
-            onCreated={(path) => openFileTab(path)}
+            rootPath={currentProjectRoot}
+            onCreated={(path, isTemp) => openFileTab(path, true, isTemp)}
           />
 
           <CloseDialogs

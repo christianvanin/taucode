@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/modules/i18n";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import {
@@ -93,6 +94,7 @@ export function Header({
   onToggleAntigravitySidePanel,
   isAntigravitySidePanelOpen,
 }: Props) {
+  const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
 
@@ -113,7 +115,7 @@ export function Header({
       size="icon"
       className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
       onClick={onOpenSettings}
-      title="Settings"
+      title={t("header.settingsTitle")}
     >
       <HugeiconsIcon icon={Settings01Icon} size={15} strokeWidth={1.75} />
     </Button>
@@ -130,7 +132,7 @@ export function Header({
       <div className="flex shrink-0 items-center gap-0.5">
         <Button
           onClick={onToggleSidebar}
-          title="Toggle sidebar"
+          title={t("header.toggleSidebarTitle")}
           variant="ghost"
           size="icon-sm"
           className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -142,7 +144,7 @@ export function Header({
           size="icon-sm"
           variant="ghost"
           onClick={onOpenCommandPalette}
-          title="Command palette"
+          title={t("header.commandPaletteTitle")}
           className="shrink-0 gap-1.5 rounded-md px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <HugeiconsIcon icon={CommandIcon} size={14} strokeWidth={1.75} />
@@ -190,22 +192,22 @@ export function Header({
             className="h-7 w-7 xl:w-auto px-0 xl:px-2 gap-1.5 rounded-md text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
             title={
               isDefaultSkill
-                ? "Skill predefinita di Gemini (sola lettura - non modificabile)"
+                ? t("header.defaultSkillTitle")
                 : isSkillSpace
-                  ? "Compila e aggiorna la Skill (sincronizza SKILL.md e skill.json)"
+                  ? t("header.compileSkillTitle")
                   : hasProjectOpen
-                    ? "Compile (TauCode/compile.json)"
-                    : "Open a project to compile"
+                    ? t("header.compileTitle")
+                    : t("header.compileOpenProject")
             }
-            aria-label={isSkillSpace ? "Compila skill" : "Compile project"}
+            aria-label={isSkillSpace ? t("header.compileSkill") : t("header.compile")}
           >
             <HugeiconsIcon icon={HammerIcon} size={14} strokeWidth={1.75} />
             <span className="hidden xl:inline">
               {isDefaultSkill
-                ? "Predefinita"
+                ? t("header.defaultSkill")
                 : isSkillSpace
-                  ? "Compila Skill"
-                  : "Compile"}
+                  ? t("header.compileSkill")
+                  : t("header.compile")}
             </span>
           </Button>
 
@@ -216,11 +218,11 @@ export function Header({
               onClick={onRun}
               disabled={!hasProjectOpen}
               className="h-7 w-7 xl:w-auto px-0 xl:px-2 gap-1.5 rounded-md text-xs font-medium text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
-              title={hasProjectOpen ? "Run (TauCode/run.json)" : "Open a project to run"}
-              aria-label="Run project"
+              title={hasProjectOpen ? t("header.runTitle") : t("header.runOpenProject")}
+              aria-label={t("header.run")}
             >
               <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={1.75} />
-              <span className="hidden xl:inline">Run</span>
+              <span className="hidden xl:inline">{t("header.run")}</span>
             </Button>
           )}
         </div>
@@ -239,7 +241,7 @@ export function Header({
               ? "bg-accent text-foreground"
               : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
-          title={isAntigravitySidePanelOpen ? "Nascondi pannello Antigravity" : "Mostra pannello Antigravity"}
+          title={isAntigravitySidePanelOpen ? t("header.antigravityHide") : t("header.antigravityShow")}
           aria-label="Toggle Antigravity Panel"
         >
           <img

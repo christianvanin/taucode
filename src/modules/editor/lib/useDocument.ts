@@ -2,6 +2,7 @@ import { isJsonPath, isSvgPath } from "@/lib/utils";
 import { notifyDocumentSaved } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
+import { getVirtualTauCodeFile } from "@/modules/taucode";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -79,7 +80,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
   // since load; overwriting is an explicit user action from the toast.
   const saveNow = useCallback(async (): Promise<boolean> => {
     const known = diskMtimeRef.current;
-    if (known !== null) {
+    if (known !== null && known > 0) {
       const stat = await invoke<FileStat>("fs_stat", {
         path,
         workspace: currentWorkspaceEnv(),
@@ -159,7 +160,25 @@ export function useDocument({ path, onDirtyChange }: Options) {
       .then((res) => {
         if (!cancelled) adoptRead(res);
       })
-      .catch((e) => {
+      .catch(async (e) => {
+        // Fallback for virtual TauCode files that are not yet materialized on disk
+        const norm = path.replace(/\\/g, "/");
+        const idx = norm.toLowerCase().lastIndexOf("/taucode/");
+        if (idx !== -1) {
+          const root = norm.slice(0, idx);
+          try {
+            const virtualContent = await getVirtualTauCodeFile(root, norm);
+            if (virtualContent !== null && !cancelled) {
+              adoptRead({
+                kind: "text",
+                content: virtualContent,
+                size: virtualContent.length,
+                mtime: 0,
+              });
+              return;
+            }
+          } catch {}
+        }
         if (!cancelled) setDoc({ status: "error", message: String(e) });
       });
 

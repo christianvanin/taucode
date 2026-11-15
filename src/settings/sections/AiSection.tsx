@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useTranslation } from "@/modules/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -81,6 +82,7 @@ interface AntigravityDownloadProgress {
 }
 
 export function AiSection() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AntigravityStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
@@ -160,6 +162,12 @@ export function AiSection() {
     void loadSkills();
     void loadMcpServers();
 
+    const handleFocus = () => {
+      void loadStatus();
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
     const unlistenPromise = listen("terax:extensions-updated", () => {
       void loadSkills();
       void loadMcpServers();
@@ -170,6 +178,8 @@ export function AiSection() {
     });
 
     return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
       unlistenPromise.then((fn) => fn());
       unlistenStatusPromise.then((fn) => fn());
     };
@@ -635,30 +645,44 @@ export function AiSection() {
       {/* SEZIONE 1: STATO MOTORE ANTIGRAVITY */}
       <div>
         <SectionHeader
-          title="Motore Antigravity AI"
-          description="Gestione del binario e della CLI di Antigravity integrata privatamente in TauCode."
+          title={t("settings.ai.engineTitle")}
+          description={t("settings.ai.engineDesc")}
         />
 
         <div className="flex flex-col gap-2">
           <SettingRow
-            title="Stato e Versione CLI"
-            description="Versione dell'eseguibile Antigravity dedicato e isolato nei dati locali di TauCode."
+            title={t("settings.ai.cliStatus")}
+            description={t("settings.ai.cliStatusDesc")}
           >
             <div className="flex items-center gap-2.5">
               {statusLoading ? (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin text-primary" />
-                  <span>Verifica...</span>
+                  <span>{t("settings.ai.verifying")}</span>
                 </div>
               ) : status?.installed ? (
                 <div className="flex items-center gap-2.5">
                   <span className="text-xs text-foreground font-mono">
-                    v{status.version || "Sconosciuta"}
+                    v{status.version || t("common.default")}
                   </span>
+
+                  <button
+                    type="button"
+                    title={t("settings.ai.refreshTooltip")}
+                    disabled={statusLoading}
+                    onClick={() => void loadStatus()}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    <HugeiconsIcon
+                      icon={Refresh01Icon}
+                      size={12}
+                      className={statusLoading ? "animate-spin" : ""}
+                    />
+                  </button>
 
                   {status.update_available && (
                     <span className="text-xs text-muted-foreground">
-                      (Aggiornamento v{status.latest_version})
+                      {t("settings.ai.updateAvailable", { version: status.latest_version ?? "" })}
                     </span>
                   )}
 
@@ -673,27 +697,24 @@ export function AiSection() {
                       <>
                         <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
                         {downloadProgress?.phase === "installing"
-                          ? "Installazione..."
+                          ? t("settings.ai.installing")
                           : downloadProgress?.percentage
                             ? `${Math.round(downloadProgress.percentage)}%`
-                            : "Download..."}
+                            : t("settings.ai.downloading")}
                       </>
                     ) : status.update_available ? (
                       <>
                         <HugeiconsIcon icon={Download01Icon} size={12} />
-                        Aggiorna
+                        {t("settings.ai.updateBtn")}
                       </>
                     ) : (
-                      <>
-                        <HugeiconsIcon icon={Refresh01Icon} size={12} />
-                        Reinstalla
-                      </>
+                      t("settings.ai.reinstallBtn")
                     )}
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2.5">
-                  <span className="text-xs text-muted-foreground">Non installata</span>
+                  <span className="text-xs text-muted-foreground">{t("settings.ai.notInstalled")}</span>
                   <Button
                     size="sm"
                     disabled={installing}
@@ -704,15 +725,15 @@ export function AiSection() {
                       <>
                         <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
                         {downloadProgress?.phase === "installing"
-                          ? "Installazione..."
+                          ? t("settings.ai.installing")
                           : downloadProgress?.percentage
                             ? `${Math.round(downloadProgress.percentage)}%`
-                            : "Download..."}
+                            : t("settings.ai.downloading")}
                       </>
                     ) : (
                       <>
                         <HugeiconsIcon icon={Download01Icon} size={12} />
-                        Scarica ora
+                        {t("settings.ai.updateBtn")}
                       </>
                     )}
                   </Button>
@@ -727,15 +748,15 @@ export function AiSection() {
                 <span className="font-medium text-foreground flex items-center gap-1.5">
                   <HugeiconsIcon icon={Loading03Icon} size={13} className="animate-spin text-primary" />
                   {downloadProgress?.phase === "installing"
-                    ? "Installazione ed estrazione in corso..."
-                    : "Download del binario in corso..."}
+                    ? t("settings.ai.installing")
+                    : t("settings.ai.downloading")}
                 </span>
                 <span className="font-mono text-muted-foreground text-[11px]">
                   {downloadProgress?.total
                     ? `${(downloadProgress.downloaded / (1024 * 1024)).toFixed(1)} MB / ${(downloadProgress.total / (1024 * 1024)).toFixed(1)} MB (${Math.round(downloadProgress.percentage)}%)`
                     : downloadProgress?.downloaded
-                      ? `${(downloadProgress.downloaded / (1024 * 1024)).toFixed(1)} MB scaricati`
-                      : "Avvio download..."}
+                      ? `${(downloadProgress.downloaded / (1024 * 1024)).toFixed(1)} MB`
+                      : t("settings.ai.downloading")}
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
@@ -751,8 +772,8 @@ export function AiSection() {
 
           {status?.executable_path && (
             <SettingRow
-              title="Percorso Binario Dedicato"
-              description="Posizione locale isolata del file eseguibile taucode-antigravity."
+              title={t("settings.ai.dedicatedPath")}
+              description={t("settings.ai.dedicatedPathDesc")}
             >
               <span className="font-mono text-[10.5px] text-muted-foreground select-all break-all max-w-[280px] text-right">
                 {status.executable_path}

@@ -53,6 +53,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/modules/i18n";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
@@ -202,32 +203,66 @@ export function GeneralSection() {
     }
   };
 
+  const { t, language, setLanguage } = useTranslation();
+
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
-        title="General"
-        description="Mode, terminal, and startup."
+        title={t("settings.nav.general")}
+        description={t("settings.general.descAppearance")}
       />
 
       <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
+        <Label>{t("settings.general.titleLanguage")}</Label>
+        <SettingRow
+          title={t("settings.general.titleLanguage")}
+          description={t("settings.general.descLanguage")}
+        >
+          <Select
+            value={language}
+            onValueChange={(val) => void setLanguage(val as "it" | "en")}
+          >
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="it" className="text-xs">
+                {t("settings.general.langItalian")}
+              </SelectItem>
+              <SelectItem value="en" className="text-xs">
+                {t("settings.general.langEnglish")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>{t("settings.general.titleAppearance")}</Label>
         <div className="grid grid-cols-3 gap-2">
-          {APPEARANCE.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setMode(o.id)}
-              className={cn(
-                "group flex h-20 flex-col items-center justify-center gap-1.5 rounded-lg border bg-card transition-all",
-                mode === o.id
-                  ? "border-foreground/60 ring-1 ring-foreground/20"
-                  : "border-border/60 hover:border-border",
-              )}
-            >
-              <HugeiconsIcon icon={o.icon} size={18} strokeWidth={1.5} />
-              <span className="text-[11.5px]">{o.label}</span>
-            </button>
-          ))}
+          {APPEARANCE.map((o) => {
+            const labelMap: Record<ThemePref, string> = {
+              system: t("settings.general.themeSystem"),
+              light: t("settings.general.themeLight"),
+              dark: t("settings.general.themeDark"),
+            };
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setMode(o.id)}
+                className={cn(
+                  "group flex h-20 flex-col items-center justify-center gap-1.5 rounded-lg border bg-card transition-all",
+                  mode === o.id
+                    ? "border-foreground/60 ring-1 ring-foreground/20"
+                    : "border-border/60 hover:border-border",
+                )}
+              >
+                <HugeiconsIcon icon={o.icon} size={18} strokeWidth={1.5} />
+                <span className="text-[11.5px]">{labelMap[o.id]}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -253,10 +288,10 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Explorer</Label>
+        <Label>{t("settings.general.titleExplorer")}</Label>
         <SettingRow
-          title="Show hidden files"
-          description="Include dot-prefixed files and folders (.env, .gitignore, .config) in the file explorer and search."
+          title={t("settings.general.showHidden")}
+          description={t("settings.general.descExplorer")}
         >
           <Switch
             checked={showHidden}
@@ -264,8 +299,8 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Git decorations"
-          description="Tint changed files and dim gitignored entries in the file explorer."
+          title={t("settings.general.gitDecorations")}
+          description={t("settings.general.gitDecorations")}
         >
           <Switch
             checked={explorerGitDecorations}
@@ -275,11 +310,11 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Terminal</Label>
+        <Label>{t("settings.general.titleTerminal")}</Label>
         <SettingRow
           title={
             <span className="inline-flex items-center gap-1.5">
-              Use WebGL renderer
+              {t("settings.general.webgl")}
               <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -309,7 +344,7 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Cursor blinking"
+          title={t("settings.general.cursorBlink")}
           description="Blink the terminal cursor. Off by default for lower idle CPU, matching VS Code and the macOS terminal."
         >
           <Switch
@@ -426,7 +461,7 @@ export function GeneralSection() {
           </SettingRow>
         )}
         <SettingRow
-          title="Letter spacing"
+          title={t("settings.general.letterSpacing")}
           description="Extra horizontal space between characters (px). Use negative values to tighten Nerd Fonts."
         >
           <Select
@@ -493,10 +528,10 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Startup</Label>
+        <Label>{t("settings.general.titleWindow")}</Label>
         <div className="flex flex-col gap-2">
           <SettingRow
-            title="Launch at login"
+            title={t("settings.general.autostart")}
             description="Open TauCode automatically when you sign in."
           >
             <Switch
@@ -505,7 +540,7 @@ export function GeneralSection() {
             />
           </SettingRow>
           <SettingRow
-            title="Restore window position & size"
+            title={t("settings.general.restoreState")}
             description="Reopen the main window where you left it. Applies on next launch."
           >
             <Switch
@@ -517,7 +552,7 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Aggiornamenti & Built-in Skills</Label>
+        <Label>{t("settings.general.titleUpdates")}</Label>
         <div className="flex flex-col gap-3">
           {/* App Update Card */}
           <div className="rounded-xl border border-border bg-card p-4 text-card-foreground">
@@ -531,17 +566,17 @@ export function GeneralSection() {
                   {updateStatus === "up-to-date" && (
                     <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
                       <HugeiconsIcon icon={BadgeCheckIcon} className="size-3.5" />
-                      All'ultima versione
+                      {t("settings.general.upToDate")}
                     </span>
                   )}
                   {updateStatus === "available" && (
                     <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-500">
-                      Nuova versione: v{updateInfo?.version}
+                      {t("settings.general.updateAvailable", { version: updateInfo?.version ?? "" })}
                     </span>
                   )}
                 </div>
                 <p className="text-[12px] text-muted-foreground">
-                  Aggiornamenti automatici distribuiti e firmati digitalmente via GitHub Releases.
+                  {t("settings.general.descUpdates")}
                 </p>
               </div>
 
@@ -554,7 +589,7 @@ export function GeneralSection() {
                     className="gap-1.5 text-[12px]"
                   >
                     <HugeiconsIcon icon={ArrowReloadHorizontalIcon} className="size-3.5" />
-                    Verifica aggiornamenti
+                    {t("settings.general.checkUpdates")}
                   </Button>
                 )}
 

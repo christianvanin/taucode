@@ -52,6 +52,8 @@ export type EditorTab = TabBase & {
    */
   preview: boolean;
   overrideLanguage?: string | null;
+  /** True when the tab is an unsaved scratch/temporary file. */
+  isTemporary?: boolean;
 };
 
 export type PreviewTab = TabBase & {
@@ -160,6 +162,7 @@ export type TabPatch = Partial<{
   /** Empty string resets a terminal tab to its cwd-derived name. */
   customTitle: string;
   overrideLanguage: string | null;
+  isTemporary: boolean;
 }>;
 
 function basename(path: string): string {
@@ -482,7 +485,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
    *   reused: if a persistent tab for the path already exists it is activated;
    *   otherwise the current preview slot is replaced with the new path.
    */
-  const openFileTab = useCallback((path: string, pin = true) => {
+  const openFileTab = useCallback((path: string, pin = true, isTemporary = false) => {
     const curr = tabsRef.current;
     if (pin) {
       // Persistent open: find any existing editor tab, pin it if needed.
@@ -511,6 +514,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           path,
           dirty: false,
           preview: false,
+          isTemporary,
         },
       ];
       tabsRef.current = nextTabs;
@@ -1092,6 +1096,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           ...(patch.path !== undefined && { path: patch.path }),
           ...(patch.overrideLanguage !== undefined && {
             overrideLanguage: patch.overrideLanguage,
+          }),
+          ...(patch.isTemporary !== undefined && {
+            isTemporary: patch.isTemporary,
           }),
         };
       }),

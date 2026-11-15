@@ -3,6 +3,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useTranslation } from "@/modules/i18n";
 import { setLspActivation } from "@/modules/settings/store";
 import {
   Cancel01Icon,
@@ -28,6 +29,7 @@ const PILL_CLASS =
   "terax-pill-in flex shrink-0 cursor-pointer [&_button]:cursor-pointer items-center gap-1.5 text-[10.5px] font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground";
 
 export function LspStatusPill({ filePath }: Props) {
+  const { t } = useTranslation();
   const hint = useLspHint(filePath);
   if (!hint) return null;
 
@@ -38,10 +40,10 @@ export function LspStatusPill({ filePath }: Props) {
           type="button"
           className="flex items-center gap-1"
           onClick={() => void setLspActivation(hint.preset.id, "enabled")}
-          title={`Start ${hint.preset.command} for this workspace`}
+          title={t("statusBar.startPresetTitle", { command: hint.preset.command })}
         >
           <HugeiconsIcon icon={SourceCodeIcon} size={11} strokeWidth={2} />
-          <span>Enable {hint.preset.name} LSP</span>
+          <span>{t("statusBar.enableLsp", { name: hint.preset.name })}</span>
         </button>
         <DismissButton preset={hint.preset} />
       </span>
@@ -74,13 +76,14 @@ export function LspStatusPill({ filePath }: Props) {
 }
 
 function ErrorPill({ preset, reason }: { preset: LspPreset; reason: string }) {
+  const { t } = useTranslation();
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
           className={PILL_CLASS}
-          title="Language server stopped"
+          title={t("statusBar.serverStopped")}
         >
           <span className="size-1.5 rounded-full bg-destructive" />
           <span>{preset.name} LSP</span>
@@ -93,7 +96,7 @@ function ErrorPill({ preset, reason }: { preset: LspPreset; reason: string }) {
         className="w-72 p-3 text-xs [&_button]:cursor-pointer"
       >
         <div className="mb-1 font-medium text-foreground">
-          {preset.name} language server stopped
+          {t("statusBar.serverStoppedDesc", { name: preset.name })}
         </div>
         <p className="mb-2 text-muted-foreground">{reason}</p>
         <div className="flex items-center gap-1.5">
@@ -103,14 +106,14 @@ function ErrorPill({ preset, reason }: { preset: LspPreset; reason: string }) {
             onClick={() => void restartPresetSessions(preset.id)}
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} strokeWidth={1.9} />
-            Restart
+            {t("statusBar.restart")}
           </button>
           <button
             type="button"
             className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
             onClick={() => void setLspActivation(preset.id, "dismissed")}
           >
-            Disable
+            {t("statusBar.disable")}
           </button>
         </div>
       </PopoverContent>
@@ -119,12 +122,13 @@ function ErrorPill({ preset, reason }: { preset: LspPreset; reason: string }) {
 }
 
 function DismissButton({ preset }: { preset: LspPreset }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
       className="rounded-full p-0.5 hover:bg-foreground/10"
       onClick={() => void setLspActivation(preset.id, "dismissed")}
-      title="Dismiss (you can re-enable from Settings)"
+      title={t("statusBar.dismissHint")}
     >
       <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2.2} />
     </button>
@@ -132,6 +136,7 @@ function DismissButton({ preset }: { preset: LspPreset }) {
 }
 
 function InstallPill({ preset }: { preset: LspPreset }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [checking, setChecking] = useState(false);
   const install = preset.install;
@@ -155,7 +160,7 @@ function InstallPill({ preset }: { preset: LspPreset }) {
         <PopoverTrigger asChild>
           <button type="button" className="flex items-center gap-1">
             <HugeiconsIcon icon={SourceCodeIcon} size={11} strokeWidth={2} />
-            <span>Install {preset.name} LSP</span>
+            <span>{t("statusBar.installLsp", { name: preset.name })}</span>
           </button>
         </PopoverTrigger>
         <DismissButton preset={preset} />
@@ -170,9 +175,7 @@ function InstallPill({ preset }: { preset: LspPreset }) {
           {preset.name} language server
         </div>
         <p className="mb-2 text-muted-foreground">
-          TauCode found no{" "}
-          <code className="text-foreground">{preset.command}</code> on your
-          PATH. Install it, then check again:
+          {t("statusBar.notFoundOnPath", { command: preset.command })}
         </p>
         {install ? (
           <div className="mb-2 flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
@@ -183,7 +186,7 @@ function InstallPill({ preset }: { preset: LspPreset }) {
               type="button"
               className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={copy}
-              title="Copy command"
+              title={t("statusBar.copyCommand")}
             >
               <HugeiconsIcon
                 icon={copied ? Tick02Icon : Copy01Icon}
@@ -200,7 +203,7 @@ function InstallPill({ preset }: { preset: LspPreset }) {
               className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={() => void openUrl(install.docsUrl).catch(console.error)}
             >
-              Documentation
+              {t("statusBar.documentation")}
             </button>
           ) : (
             <span />
@@ -211,7 +214,7 @@ function InstallPill({ preset }: { preset: LspPreset }) {
             onClick={checkAgain}
             disabled={checking}
           >
-            {checking ? "Checking..." : "Check again"}
+            {checking ? t("statusBar.checking") : t("statusBar.checkAgain")}
           </button>
         </div>
       </PopoverContent>
@@ -226,6 +229,7 @@ function ActivePill({
   preset: LspPreset;
   starting: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -233,7 +237,7 @@ function ActivePill({
           type="button"
           className={PILL_CLASS}
           title={
-            starting ? "Language server starting" : "Language server active"
+            starting ? t("statusBar.serverStarting") : t("statusBar.serverActive")
           }
         >
           {starting ? (
@@ -259,8 +263,9 @@ function ActivePill({
           {preset.name} language server
         </div>
         <p className="mb-2 text-muted-foreground">
-          <code className="text-foreground">{preset.command}</code>{" "}
-          {starting ? "is starting" : "is running"} for this workspace.
+          {starting
+            ? t("statusBar.serverStartingDesc", { command: preset.command })
+            : t("statusBar.serverRunningDesc", { command: preset.command })}
         </p>
         <div className="flex items-center gap-1.5">
           <button
@@ -269,14 +274,14 @@ function ActivePill({
             onClick={() => void restartPresetSessions(preset.id)}
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} strokeWidth={1.9} />
-            Restart
+            {t("statusBar.restart")}
           </button>
           <button
             type="button"
             className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
             onClick={() => void setLspActivation(preset.id, "dismissed")}
           >
-            Disable
+            {t("statusBar.disable")}
           </button>
         </div>
       </PopoverContent>

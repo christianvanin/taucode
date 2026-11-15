@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { useTranslation } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setShortcuts } from "@/modules/settings/store";
 import {
@@ -31,6 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 export function ShortcutsSection() {
+  const { t } = useTranslation();
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const [search, setSearch] = useState("");
   const [recordingId, setRecordingId] = useState<ShortcutId | null>(null);
@@ -74,8 +76,8 @@ export function ShortcutsSection() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <SectionHeader
-          title="Shortcuts"
-          description="View and customize keyboard shortcuts."
+          title={t("settings.shortcuts.title")}
+          description={t("settings.shortcuts.desc")}
         />
         <Button
           variant="outline"
@@ -88,7 +90,7 @@ export function ShortcutsSection() {
             size={12}
             strokeWidth={2}
           />
-          Reset All
+          {t("settings.shortcuts.resetAll")}
         </Button>
       </div>
 
@@ -100,7 +102,7 @@ export function ShortcutsSection() {
           className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
         />
         <Input
-          placeholder="Search shortcuts..."
+          placeholder={t("settings.shortcuts.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 pl-9 text-[12.5px]"
@@ -140,19 +142,18 @@ export function ShortcutsSection() {
       <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset all shortcuts?</AlertDialogTitle>
+            <AlertDialogTitle>{t("settings.shortcuts.resetTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will revert all your custom keyboard shortcuts to their
-              factory defaults. This action cannot be undone.
+              {t("settings.shortcuts.resetDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={onResetAll}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Reset All
+              {t("settings.shortcuts.resetAll")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

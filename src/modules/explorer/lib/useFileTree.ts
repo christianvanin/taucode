@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
+import { getVirtualTauCodeEntries, isTauCodePath } from "@/modules/taucode";
 
 export type DirEntry = {
   name: string;
@@ -107,6 +108,10 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     () => (rootPath ? normalizeFsPath(rootPath) : null),
     [rootPath],
   );
+  const normalizedRootRef = useRef(normalizedRoot);
+  useEffect(() => {
+    normalizedRootRef.current = normalizedRoot;
+  }, [normalizedRoot]);
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const showHiddenRef = useRef(showHidden);
   const gitDecorations = usePreferencesStore((s) => s.explorerGitDecorations);
@@ -158,12 +163,72 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       setNodes((s) => ({ ...s, [path]: { status: "loading" } }));
     }
     try {
-      const entries = await invoke<DirEntry[]>("fs_read_dir", {
-        path,
-        showHidden: showHiddenRef.current,
-        gitDecorations: gitDecorationsRef.current,
-        workspace: currentWorkspaceEnv(),
-      });
+      let rawEntries: DirEntry[] = [];
+      try {
+        rawEntries = await invoke<DirEntry[]>("fs_read_dir", {
+          path,
+          showHidden: showHiddenRef.current,
+          gitDecorations: gitDecorationsRef.current,
+          workspace: currentWorkspaceEnv(),
+        });
+      } catch (err) {
+        // If fs_read_dir fails (e.g. virtual TauCode path not yet on disk), check if it's virtual
+        const currentRoot = normalizedRootRef.current;
+        if (currentRoot && isTauCodePath(currentRoot, path)) {
+          const virtual = getVirtualTauCodeEntries(currentRoot, path);
+          if (virtual) {
+            rawEntries = [];
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      let entries = [...rawEntries];
+      const currentRoot = normalizedRootRef.current;
+
+      // Overlay virtual TauCode folder at workspace root if not present physically (skip when browsing OS root '/')
+      if (currentRoot && currentRoot !== "/" && path === currentRoot) {
+        const hasTauCode = entries.some(
+          (e) => e.name.toLowerCase() === "taucode"
+        );
+        if (!hasTauCode) {
+          entries.push({
+            name: "TauCode",
+            kind: "dir",
+            size: 0,
+            mtime: 0,
+            gitignored: false,
+          });
+          entries.sort((a, b) => {
+            if (a.kind === "dir" && b.kind !== "dir") return -1;
+            if (a.kind !== "dir" && b.kind === "dir") return 1;
+            return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+          });
+        }
+      }
+
+      // Overlay virtual files/subdirs inside TauCode/ or TauCode/workflow/
+      if (currentRoot && isTauCodePath(currentRoot, path)) {
+        const virtualItems = getVirtualTauCodeEntries(currentRoot, path);
+        if (virtualItems) {
+          const existingNames = new Set(
+            entries.map((e) => e.name.toLowerCase())
+          );
+          for (const v of virtualItems) {
+            if (!existingNames.has(v.name.toLowerCase())) {
+              entries.push(v);
+            }
+          }
+          entries.sort((a, b) => {
+            if (a.kind === "dir" && b.kind !== "dir") return -1;
+            if (a.kind !== "dir" && b.kind === "dir") return 1;
+            return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+          });
+        }
+      }
 
       const prev = nodesRef.current[path];
       if (prev?.status === "loaded" && sameDirListing(prev.entries, entries)) {

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTranslation } from "@/modules/i18n";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -348,6 +349,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onOpenFile,
   onNavigateToPath,
 }: Props) {
+  const { t } = useTranslation();
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
   const refreshAnimationRef = useRef<number | null>(null);
   const [refreshAnimating, setRefreshAnimating] = useState(false);
@@ -768,7 +770,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   value={scm.commitMessage}
                   onChange={(event) => scm.setCommitMessage(event.target.value)}
                   onKeyDown={handleCommitShortcut}
-                  placeholder="Commit message"
+                  placeholder={t("sourceControl.commitPlaceholder")}
                   rows={3}
                   className={cn(
                     "min-h-[72px] border-border resize-none rounded-lg bg-transparent px-3 pb-7 pt-2.5 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus:border-0",
@@ -798,8 +800,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <span className="truncate font-medium text-foreground/85">
                   {stagedCount === 0
-                    ? "Nothing staged"
-                    : `${stagedCount} ${stagedCount === 1 ? "file" : "files"} staged`}
+                    ? t("sourceControl.nothingStaged")
+                    : stagedCount === 1
+                      ? t("sourceControl.fileStaged")
+                      : t("sourceControl.filesStaged", { count: stagedCount })}
                 </span>
                 <span className="ml-auto shrink-0 truncate text-muted-foreground/65">
                   {pushStatusLabel}
@@ -815,7 +819,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       disabled={!canCommit}
                       onClick={() => void scm.commit()}
                     >
-                      {scm.actionBusy === "commit" ? "Committing…" : "Commit"}
+                      {scm.actionBusy === "commit" ? t("sourceControl.committing") : t("sourceControl.commit")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -837,7 +841,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       disabled={!scm.canPush || !!scm.actionBusy}
                       onClick={() => void scm.push()}
                     >
-                      {scm.actionBusy === "push" ? "Pushing…" : "Push"}
+                      {scm.actionBusy === "push" ? t("sourceControl.pushing") : t("sourceControl.push")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -928,21 +932,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogTitle>{t("sourceControl.discardConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {scm.pendingDiscard?.scope === "all"
-                ? `This will discard ${scm.pendingDiscard.label} and cannot be undone.`
+                ? t("sourceControl.discardConfirmDescAll", { label: scm.pendingDiscard.label })
                 : scm.pendingDiscard
-                  ? `Discard changes in "${scm.pendingDiscard.label}"? This cannot be undone.`
+                  ? t("sourceControl.discardConfirmDescFile", { label: scm.pendingDiscard.label })
                   : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => scm.cancelPendingDiscard()}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => void scm.confirmPendingDiscard()}>
-              Discard
+              {t("sourceControl.discard")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -974,6 +978,7 @@ function PanelCenter({
 }
 
 function CleanTreeHint({ repoLabel }: { repoLabel: string }) {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center">
       <div className="flex size-8 items-center justify-center rounded-full border border-border/55 text-muted-foreground">
@@ -984,10 +989,10 @@ function CleanTreeHint({ repoLabel }: { repoLabel: string }) {
         />
       </div>
       <div className="text-[12px] font-medium text-foreground">
-        Working tree clean
+        {t("sourceControl.workingTreeClean")}
       </div>
       <div className="text-[10.5px] leading-snug text-muted-foreground">
-        on <span className="font-mono text-foreground/80">{repoLabel}</span>
+        {t("sourceControl.onBranch", { branch: repoLabel })}
       </div>
     </div>
   );
@@ -1021,6 +1026,7 @@ const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
 });
 
 function DivergedBanner() {
+  const { t } = useTranslation();
   return (
     <div className="mx-2 mt-1 flex h-7 items-center gap-1.5 rounded-md border border-border/60 bg-foreground/[0.04] px-2 text-[10.5px] leading-none text-muted-foreground">
       <HugeiconsIcon
@@ -1030,10 +1036,7 @@ function DivergedBanner() {
         className="shrink-0"
       />
       <span className="min-w-0 flex-1 truncate">
-        <span className="font-medium text-foreground/85">
-          Diverged from upstream
-        </span>
-        <span className="ml-1 opacity-75">— resolve in terminal</span>
+        {t("sourceControl.divergedUpstream")}
       </span>
     </div>
   );
@@ -1047,18 +1050,19 @@ function ListHeader({
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "list-header" }>;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex h-7 items-center gap-2 px-3">
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
-        Changes
+        {t("sourceControl.changes")}
       </span>
       <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
         {row.count}
       </span>
       <label className="ml-auto flex shrink-0 cursor-pointer select-none items-center gap-1.5 text-[10.5px] font-medium text-muted-foreground hover:text-foreground">
-        <span>All</span>
+        <span>{t("common.all")}</span>
         <Checkbox
-          aria-label="Stage all changes"
+          aria-label={t("sourceControl.stageAll")}
           checked={checkboxValue(headerCheckState)}
           disabled={actionBusy !== null}
           onCheckedChange={() => void onToggleAll()}

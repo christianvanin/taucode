@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IS_WINDOWS } from "@/lib/platform";
+import { useTranslation } from "@/modules/i18n";
 import {
   LOCAL_WORKSPACE,
   useWorkspaceEnvStore,
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function WorkspaceEnvSelector({ onSelect }: Props) {
+  const { t } = useTranslation();
   const isWindows =
     IS_WINDOWS ||
     (typeof navigator !== "undefined" &&
@@ -46,7 +48,7 @@ export function WorkspaceEnvSelector({ onSelect }: Props) {
         <button
           type="button"
           className="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0 data-[state=open]:bg-accent data-[state=open]:text-foreground"
-          title="Workspace environment"
+          title={t("statusBar.workspaceEnv")}
         >
           <HugeiconsIcon
             icon={ServerStack03Icon}
@@ -58,16 +60,16 @@ export function WorkspaceEnvSelector({ onSelect }: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuItem onSelect={() => onSelect(LOCAL_WORKSPACE)}>
-          Windows Local
+          {t("statusBar.windowsLocal")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {distros.length === 0 ? (
           <DropdownMenuItem disabled>
             {loading
-              ? "Loading WSL distros..."
+              ? t("statusBar.wslLoading")
               : error
-                ? "WSL unavailable"
-                : "No WSL distros found"}
+                ? t("statusBar.wslUnavailable")
+                : t("statusBar.wslNone")}
           </DropdownMenuItem>
         ) : (
           distros.map((distro) => (
@@ -82,7 +84,7 @@ export function WorkspaceEnvSelector({ onSelect }: Props) {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void refreshDistros()}>
           <HugeiconsIcon icon={Refresh01Icon} size={13} strokeWidth={1.75} />
-          Refresh
+          {t("common.refresh")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

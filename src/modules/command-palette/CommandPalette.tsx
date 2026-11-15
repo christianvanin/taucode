@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { useTranslation } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   getBindingTokens,
@@ -55,6 +56,7 @@ export function CommandPalette({
   onOpenContentHit,
   insertCommand,
 }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [value, setValue] = useState("");
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -136,17 +138,17 @@ export function CommandPalette({
 
   const placeholder =
     parsed.mode === "content"
-      ? "Find text in files..."
+      ? t("commandPalette.placeholderContent")
       : parsed.mode === "history"
-        ? "Search command history..."
-        : "Type a command, > for history, # to find in files";
+        ? t("commandPalette.placeholderHistory")
+        : t("commandPalette.placeholder");
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Command Palette"
-      description="Run a command or search your workspace."
+      title={t("commandPalette.title")}
+      description={t("commandPalette.desc")}
       className="top-1/2 w-[min(680px,calc(100vw-32px))] -translate-y-1/2"
     >
       <Command
@@ -189,11 +191,11 @@ export function CommandPalette({
                 })
               )
             ) : parsed.mode === "content" ? (
-              <CommandGroup heading="Contents">
+              <CommandGroup heading={t("commandPalette.contents")}>
                 {!workspaceRoot ? (
-                  <StatusItem label="No workspace root" />
+                  <StatusItem label={t("commandPalette.noWorkspaceRoot")} />
                 ) : parsed.term.length < CONTENT_SEARCH_MIN_QUERY ? (
-                  <StatusItem label="Type at least 2 characters" />
+                  <StatusItem label={t("commandPalette.typeMore")} />
                 ) : (
                   <AsyncBody
                     loading={content.loading}
@@ -399,10 +401,11 @@ function StatusItem({
 }
 
 function EmptyHint() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
       <HugeiconsIcon icon={CommandIcon} size={18} strokeWidth={1.5} />
-      <span>No commands found. Type ? to see search modes.</span>
+      <span>{t("commandPalette.emptyHint")}</span>
     </div>
   );
 }

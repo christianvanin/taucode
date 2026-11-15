@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";
+import { useTranslation } from "@/modules/i18n";
 import { InlineInput } from "./InlineInput";
 import { explorerGitTextClass } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
@@ -27,6 +28,7 @@ export type EntryRowProps = {
   isDropTarget?: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
+  onSetProjectRoot?: (path: string) => void;
   gitStatusCode?: GitStatusCode | null;
   gitignored?: boolean;
 };
@@ -45,10 +47,12 @@ function EntryRowImpl(props: EntryRowProps) {
     isDropTarget = false,
     onOpenFile,
     onSelectPath,
+    onSetProjectRoot,
     gitStatusCode,
     gitignored = false,
   } = props;
 
+  const { t } = useTranslation();
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
   const paddingLeft = 6 + depth * 12;
 
@@ -123,6 +127,20 @@ function EntryRowImpl(props: EntryRowProps) {
       >
         {name}
       </span>
+      {isDir && onSetProjectRoot && (
+        <span
+          role="button"
+          tabIndex={-1}
+          title={t("explorer.openAsProject")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetProjectRoot(path);
+          }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-background/80 text-muted-foreground hover:text-primary transition-all shrink-0 cursor-pointer"
+        >
+          <HugeiconsIcon icon={Folder01Icon} size={13} strokeWidth={2} />
+        </span>
+      )}
     </button>
   );
 }
@@ -142,6 +160,7 @@ export function PendingRow({
   onCommit,
   onCancel,
 }: PendingRowProps) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
@@ -157,7 +176,7 @@ export function PendingRow({
       />
       <InlineInput
         initial=""
-        placeholder={kind === "dir" ? "New folder" : "New file"}
+        placeholder={kind === "dir" ? t("explorer.newFolder") : t("explorer.newFile")}
         onCommit={onCommit}
         onCancel={onCancel}
       />

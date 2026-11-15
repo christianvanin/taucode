@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useTranslation } from "@/modules/i18n";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { File02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -18,7 +19,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rootPath: string | null;
-  onCreated: (path: string) => void;
+  onCreated: (path: string, isTemporary?: boolean) => void;
 };
 
 function joinPath(parent: string, name: string): string {
@@ -32,6 +33,7 @@ export function NewEditorDialog({
   rootPath,
   onCreated,
 }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState("untitled.txt");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,20 +53,32 @@ export function NewEditorDialog({
     }, 0);
   }, [open]);
 
+  const isTemporary = !rootPath;
+
   const submit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Name is required");
+      setError(t("dialogs.newFile.errorRequired"));
       return;
     }
     if (trimmed.includes("..")) {
-      setError("Path must be relative");
+      setError(t("dialogs.newFile.errorRelative"));
       return;
     }
-    if (!rootPath) {
-      setError("No workspace root");
+
+    if (isTemporary) {
+      try {
+        const tempPath = await invoke<string>("fs_create_temp_file", {
+          name: trimmed,
+        });
+        onCreated(tempPath, true);
+        onOpenChange(false);
+      } catch (e) {
+        setError(String(e));
+      }
       return;
     }
+
     const path = trimmed.startsWith("/")
       ? trimmed
       : joinPath(rootPath, trimmed);
@@ -73,7 +87,7 @@ export function NewEditorDialog({
         path,
         workspace: currentWorkspaceEnv(),
       });
-      onCreated(path);
+      onCreated(path, false);
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
@@ -86,11 +100,12 @@ export function NewEditorDialog({
         <DialogHeader>
           <DialogTitle className="flex gap-1.75">
             <HugeiconsIcon icon={File02Icon} size={16} strokeWidth={1.75} />
-            New file
+            {isTemporary ? t("dialogs.newFile.titleTemp") : t("dialogs.newFile.title")}
           </DialogTitle>
           <DialogDescription>
-            Filename (relative to workspace root). The extension determines the
-            language mode.
+            {isTemporary
+              ? t("dialogs.newFile.descTemp")
+              : t("dialogs.newFile.desc")}
           </DialogDescription>
         </DialogHeader>
         <Input
@@ -112,14 +127,16 @@ export function NewEditorDialog({
           <div className="text-xs text-destructive">{error}</div>
         ) : (
           <div className="text-xs text-muted-foreground truncate">
-            {rootPath ? joinPath(rootPath, name.trim() || "…") : "—"}
+            {isTemporary
+              ? `${t("dialogs.newFile.tempScratchBadge")} ${name.trim() || "untitled.txt"}`
+              : rootPath ? joinPath(rootPath, name.trim() || "…") : "—"}
           </div>
         )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
-          <Button onClick={() => void submit()}>Create</Button>
+          <Button onClick={() => void submit()}>{t("common.create")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

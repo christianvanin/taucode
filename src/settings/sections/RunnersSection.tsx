@@ -1,21 +1,27 @@
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectGroup,
-  SelectLabel,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useTranslation } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTauCodeTemplates } from "@/modules/settings/store";
 import { getTemplatesForProject, type ProjectType } from "@/modules/taucode/projectAnalyzer";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { HammerIcon, PlayIcon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  HammerIcon,
+  PlayIcon,
+  Search01Icon,
+  Tick02Icon,
+  UnfoldMoreIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 
@@ -147,8 +153,46 @@ const PROJECT_GROUPS: { label: string; options: { value: ProjectType; label: str
 ];
 
 export function RunnersSection() {
+  const { t } = useTranslation();
   const [selectedType, setSelectedType] = useState<ProjectType>("rust_cargo");
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const tauCodeTemplates = usePreferencesStore((s) => s.tauCodeTemplates);
+
+  const allOptions = useMemo(() => {
+    return PROJECT_GROUPS.flatMap((g) => g.options);
+  }, []);
+
+  const currentOption = allOptions.find((opt) => opt.value === selectedType);
+  const currentLabel = currentOption ? currentOption.label : selectedType;
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => searchInputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setSearch("");
+    }
+  }, [open]);
+
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return PROJECT_GROUPS;
+    return PROJECT_GROUPS.map((group) => {
+      const groupMatches = group.label.toLowerCase().includes(q);
+      const matchingOptions = group.options.filter(
+        (opt) =>
+          groupMatches ||
+          opt.label.toLowerCase().includes(q) ||
+          opt.value.toLowerCase().includes(q)
+      );
+      return {
+        ...group,
+        options: matchingOptions,
+      };
+    }).filter((g) => g.options.length > 0);
+  }, [search]);
 
   // Derive the current template for the selected type, either from custom preferences or defaults
   const currentTemplate =
@@ -172,34 +216,128 @@ export function RunnersSection() {
   return (
     <div className="flex flex-col gap-8 pb-24">
       <SectionHeader
-        title="TauCode Runners"
-        description="Configure how projects are built and executed. These scripts adapt automatically based on the detected project structure."
+        title={t("settings.runners.title")}
+        description={t("settings.runners.desc")}
       />
 
       <SettingRow
-        title="Project Target"
-        description="Select a project structure to customize its default runners."
+        title={t("settings.runners.target")}
+        description={t("settings.runners.targetDesc")}
       >
-        <Select
-          value={selectedType}
-          onValueChange={(v) => setSelectedType(v as ProjectType)}
-        >
-          <SelectTrigger className="h-8 w-[180px] text-[12px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[350px]">
-            {PROJECT_GROUPS.map((group) => (
-              <SelectGroup key={group.label}>
-                <SelectLabel className="text-[11px] uppercase text-muted-foreground font-semibold px-2 py-1.5">{group.label}</SelectLabel>
-                {group.options.map((pt) => (
-                  <SelectItem key={pt.value} value={pt.value} className="text-[12px] pl-6">
-                    {pt.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              role="combobox"
+              aria-expanded={open}
+              className="flex h-8 min-w-[190px] items-center justify-between gap-2 rounded-3xl border border-transparent bg-input/50 px-3 py-1.5 text-[12px] whitespace-nowrap transition-[color,box-shadow,background-color] outline-none hover:bg-input/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 cursor-pointer"
+            >
+              <span className="truncate font-medium">{currentLabel}</span>
+              <HugeiconsIcon
+                icon={UnfoldMoreIcon}
+                strokeWidth={2}
+                className="pointer-events-none size-4 text-muted-foreground shrink-0"
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-[280px] p-0 rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl overflow-hidden"
+            align="end"
+            sideOffset={4}
+          >
+            {/* Barra di ricerca con icona e pulsante reset */}
+            <div className="p-2 border-b border-border/50 bg-popover/80 backdrop-blur-xs">
+              <div className="relative flex items-center">
+                <HugeiconsIcon
+                  icon={Search01Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="absolute left-2.5 text-muted-foreground pointer-events-none"
+                />
+                <Input
+                  ref={searchInputRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setOpen(false);
+                    } else if (e.key === "Enter") {
+                      const firstGroup = filteredGroups[0];
+                      if (firstGroup && firstGroup.options[0]) {
+                        setSelectedType(firstGroup.options[0].value);
+                        setOpen(false);
+                      }
+                    }
+                  }}
+                  placeholder={t("settings.runners.searchTarget")}
+                  className="h-8 pl-8 pr-7 text-xs bg-input/50 border-transparent rounded-xl focus-visible:ring-1 focus-visible:ring-primary/40"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Pannello a scorrimento */}
+            <ScrollArea className="max-h-[300px]">
+              <div className="p-1">
+                {filteredGroups.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    {t("settings.runners.noTargetFound")}
+                  </div>
+                ) : (
+                  filteredGroups.map((group) => (
+                    <div key={group.label} className="mb-2 last:mb-0">
+                      <div className="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground select-none">
+                        {group.label}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {group.options.map((pt) => {
+                          const isSelected = pt.value === selectedType;
+                          return (
+                            <button
+                              key={pt.value}
+                              type="button"
+                              onClick={() => {
+                                setSelectedType(pt.value);
+                                setOpen(false);
+                              }}
+                              className={cn(
+                                "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[12px] transition-colors cursor-pointer select-none",
+                                isSelected
+                                  ? "bg-accent text-accent-foreground font-medium"
+                                  : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                              )}
+                            >
+                              <span className="truncate">{pt.label}</span>
+                              {isSelected && (
+                                <HugeiconsIcon
+                                  icon={Tick02Icon}
+                                  size={14}
+                                  strokeWidth={2}
+                                  className="text-primary shrink-0 ml-2"
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
       </SettingRow>
 
       {/* Compile Phase Block */}
@@ -207,8 +345,8 @@ export function RunnersSection() {
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={HammerIcon} size={16} className="text-primary" />
           <div>
-            <h3 className="text-[13px] font-semibold leading-none">Compile Phase</h3>
-            <p className="text-[11.5px] text-muted-foreground mt-1.5">Commands executed to build or prepare the project before running.</p>
+            <h3 className="text-[13px] font-semibold leading-none">{t("settings.runners.compilePhase")}</h3>
+            <p className="text-[11.5px] text-muted-foreground mt-1.5">{t("settings.runners.compilePhaseDesc")}</p>
           </div>
         </div>
 
@@ -246,8 +384,8 @@ export function RunnersSection() {
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={PlayIcon} size={16} className="text-primary" />
           <div>
-            <h3 className="text-[13px] font-semibold leading-none">Run Phase</h3>
-            <p className="text-[11.5px] text-muted-foreground mt-1.5">Commands executed to start the application or dev server.</p>
+            <h3 className="text-[13px] font-semibold leading-none">{t("settings.runners.runPhase")}</h3>
+            <p className="text-[11.5px] text-muted-foreground mt-1.5">{t("settings.runners.runPhaseDesc")}</p>
           </div>
         </div>
 

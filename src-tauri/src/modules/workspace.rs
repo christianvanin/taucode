@@ -308,7 +308,7 @@ fn compute_appimage_env_overrides(
     out
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum WorkspaceEnv {
     #[default]
@@ -375,9 +375,18 @@ pub(crate) fn validate_wsl_distro_name(distro: &str) -> Result<(), String> {
 }
 
 #[cfg(windows)]
+pub fn is_windows_drive_path(path: &str) -> bool {
+    let clean = path.trim_start_matches('/');
+    let bytes = clean.as_bytes();
+    (bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
+        || clean.starts_with(r"\\?\")
+}
+
+#[cfg(windows)]
 fn wsl_drvfs_to_windows(path: &str) -> Option<PathBuf> {
     let normalized = path.replace('\\', "/");
     let rest = normalized.strip_prefix("/mnt/")?;
+    let rest = rest.strip_prefix("host/").unwrap_or(rest);
     let mut parts = rest.splitn(2, '/');
     let drive = parts.next()?;
     if drive.len() != 1 {
@@ -421,9 +430,18 @@ pub fn wsl_path_to_unc(distro: &str, path: &str) -> PathBuf {
 
 #[cfg(windows)]
 pub fn wsl_path_to_host(distro: &str, path: &str) -> PathBuf {
-    // `/mnt/<drive>` is drvfs-backed Windows storage. Accessing it through the
-    // WSL UNC share can return "Access is denied" on Windows even though the
-    // same path is readable inside WSL. Use the native drive path instead.
+    // 1. Se è già un percorso Windows nativo (es. C:\... o C:/... o /C:/...)
+    if is_windows_drive_path(path) {
+        let clean = path.trim_start_matches('/');
+        return PathBuf::from(clean.replace('/', "\\"));
+    }
+
+    // 2. Se è già un percorso UNC (es. \\wsl.localhost\... o //wsl.localhost/...)
+    if path.starts_with(r"\\") || path.starts_with("//") {
+        return PathBuf::from(path.replace('/', "\\"));
+    }
+
+    // 3. `/mnt/<drive>` o `/mnt/host/<drive>` è storage Windows montato in drvfs.
     wsl_drvfs_to_windows(path).unwrap_or_else(|| wsl_path_to_unc(distro, path))
 }
 
@@ -674,6 +692,22 @@ mod tests {
         assert_eq!(
             resolve_path(path, &WorkspaceEnv::Local),
             PathBuf::from(path)
+        );
+    }
+
+    #[test]
+    fn wsl_path_to_host_handles_native_windows_paths() {
+        assert_eq!(
+            wsl_path_to_host("Ubuntu", "C:/Users/vinicios/repo"),
+            PathBuf::from(r"C:\Users\vinicios\repo")
+        );
+        assert_eq!(
+            wsl_path_to_host("Ubuntu", r"D:\progetti\app"),
+            PathBuf::from(r"D:\progetti\app")
+        );
+        assert_eq!(
+            wsl_path_to_host("Ubuntu", "/mnt/host/c/repo"),
+            PathBuf::from(r"C:\repo")
         );
     }
 

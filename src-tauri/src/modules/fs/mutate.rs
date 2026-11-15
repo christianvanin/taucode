@@ -206,6 +206,59 @@ pub fn fs_copy(
     Ok(created_paths)
 }
 
+/// Creates a temporary scratch file in the system temp directory (%TEMP%/taucode/scratch/<name>).
+/// If a file with the same name exists, it appends a timestamp suffix to avoid collisions.
+/// Returns the canonical path of the created temporary file.
+#[tauri::command]
+pub fn fs_create_temp_file(name: String) -> Result<String, String> {
+    let scratch_dir = std::env::temp_dir().join("taucode").join("scratch");
+    std::fs::create_dir_all(&scratch_dir).map_err(|e| {
+        log::debug!("fs_create_temp_file: create_dir_all failed: {e}");
+        e.to_string()
+    })?;
+
+    let clean_name = std::path::Path::new(&name)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "untitled.txt".to_string());
+
+    let mut target = scratch_dir.join(&clean_name);
+    if target.exists() {
+        let stem = std::path::Path::new(&clean_name)
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "untitled".to_string());
+        let ext = std::path::Path::new(&clean_name)
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy()))
+            .unwrap_or_default();
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        target = scratch_dir.join(format!("{stem}_{millis}{ext}"));
+    }
+
+    std::fs::write(&target, "").map_err(|e| {
+        log::debug!("fs_create_temp_file: write failed: {e}");
+        e.to_string()
+    })?;
+
+    Ok(super::to_canon(&target))
+}
+
+/// Safely removes a scratch file from the temporary directory.
+#[tauri::command]
+pub fn fs_cleanup_temp_file(path: String) -> Result<(), String> {
+    let scratch_dir = std::env::temp_dir().join("taucode").join("scratch");
+    let p = std::path::PathBuf::from(&path);
+    // Security check: only remove files located inside the taucode scratch directory
+    if p.starts_with(&scratch_dir) && p.is_file() {
+        let _ = std::fs::remove_file(&p);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +328,7 @@ mod tests {
             vec![s(src.path().join("a.txt")), s(src.path().join("d"))],
             s(dest.path().to_path_buf()),
             None,
+            None,
         )
         .expect("copy");
 
@@ -292,6 +346,7 @@ mod tests {
         let err = fs_copy(
             vec![s(src.path().join("a.txt"))],
             s(dest.path().to_path_buf()),
+            None,
             None,
         )
         .unwrap_err();

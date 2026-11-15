@@ -11,6 +11,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ComponentType, lazy, Suspense, useEffect, useState, useMemo } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useTranslation } from "@/modules/i18n";
 import { GeneralSection } from "./sections/GeneralSection";
 import { useExtensionsStore } from "@/modules/extensions/store";
 import { ExtensionRegistry } from "@/modules/extensions/ExtensionRegistry";
@@ -134,9 +135,52 @@ function ExtensionSettingHost({
 }
 
 export function SettingsApp({ tab }: { tab?: AppSettingsTab }) {
+  const { t } = useTranslation();
   const [active, setActive] = useState<string>(tab?.activeSettingsTab ?? "general");
   const init = usePreferencesStore((s) => s.init);
   const extensions = useExtensionsStore((s) => s.extensions);
+
+  const staticTabs: TabItem[] = useMemo(
+    () => [
+      {
+        id: "general",
+        label: t("settings.nav.general"),
+        icon: Settings01Icon,
+        component: GeneralSection,
+      },
+      {
+        id: "editor",
+        label: t("settings.nav.editor"),
+        icon: SourceCodeIcon,
+        component: EditorSection,
+      },
+      {
+        id: "ai",
+        label: t("settings.nav.ai"),
+        imgSrc: "/antigravity/antigravity.svg",
+        component: AiSection,
+      },
+      {
+        id: "extensions",
+        label: t("settings.nav.extensions"),
+        icon: PackageIcon,
+        component: ExtensionsSection,
+      },
+      {
+        id: "lsp",
+        label: t("settings.nav.lsp"),
+        icon: ServerStack01Icon,
+        component: LspSection,
+      },
+      {
+        id: "runners",
+        label: t("settings.nav.runners"),
+        icon: HammerIcon,
+        component: RunnersSection,
+      },
+    ],
+    [t],
+  );
 
   const allTabs = useMemo(() => {
     const extSettings = ExtensionRegistry.getActiveSettings();
@@ -152,8 +196,8 @@ export function SettingsApp({ tab }: { tab?: AppSettingsTab }) {
         />
       ),
     }));
-    return [...STATIC_TABS, ...custom];
-  }, [extensions]);
+    return [...staticTabs, ...custom];
+  }, [staticTabs, extensions]);
 
   const ActiveSection = allTabs.find((t) => t.id === active)?.component || STATIC_TABS[0].component;
 

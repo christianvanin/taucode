@@ -73,6 +73,18 @@ export async function sanitizeAndVerifySpaces(
       continue;
     }
 
+    // In local Windows, a Linux-only root path (like "/" or "/root") is invalid
+    if (space.env?.kind === "local" || !space.env) {
+      const isWinDrive = /^[a-zA-Z]:[\\/]/.test(space.root.replace(/^\//, ""));
+      const isUnc = space.root.startsWith("//") || space.root.startsWith("\\\\");
+      if (!isWinDrive && !isUnc) {
+        modified = true;
+        const newName = space.name.startsWith("WSL") ? "Default" : space.name;
+        verifiedSpaces.push({ ...space, root: null, name: newName });
+        continue;
+      }
+    }
+
     // Verify folder is reachable and accessible
     const reachable = await checkDir(space.root, space.env);
     if (!reachable) {

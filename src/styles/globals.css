@@ -249,12 +249,18 @@ html[data-chrome="borderless"][data-fullscreen="true"] .terax-bg-surface {
 .xterm-viewport {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  background-color: transparent !important;
 }
 .xterm .xterm-viewport::-webkit-scrollbar,
 .xterm-viewport::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
   display: none !important;
+}
+.xterm {
+  padding: 10px 14px;
+  box-sizing: border-box;
+  height: 100%;
 }
 .xterm,
 .xterm-screen,

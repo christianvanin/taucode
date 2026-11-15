@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Tab } from "./useTabs";
 import { normalizeFsPath } from "@/modules/explorer/lib/useFileTree";
+import type { WorkspaceEnv } from "@/modules/workspace";
 
 type Result = {
   explorerRoot: string | null;
@@ -11,6 +12,7 @@ export function useWorkspaceCwd(
   activeSpaceRoot: string | null,
   activeTab: Tab | undefined,
   home: string | null,
+  workspaceEnv?: WorkspaceEnv,
 ): Result {
   const lastTerminalCwd = useRef<string | null>(null);
 
@@ -21,8 +23,15 @@ export function useWorkspaceCwd(
   }, [activeTab]);
 
   const explorerRoot = useMemo<string | null>(() => {
-    return activeSpaceRoot ? normalizeFsPath(activeSpaceRoot) : null;
-  }, [activeSpaceRoot]);
+    if (!activeSpaceRoot) return null;
+    const norm = normalizeFsPath(activeSpaceRoot);
+    if (workspaceEnv?.kind === "local" || !workspaceEnv) {
+      const isWinDrive = /^[a-zA-Z]:[\\/]/.test(norm.replace(/^\//, ""));
+      const isUnc = norm.startsWith("//") || norm.startsWith("\\\\");
+      if (!isWinDrive && !isUnc) return null;
+    }
+    return norm;
+  }, [activeSpaceRoot, workspaceEnv]);
 
   const inheritedCwdForNewTab = useCallback((): string | undefined => {
     if (activeTab?.kind === "terminal" && activeTab.cwd) return activeTab.cwd;

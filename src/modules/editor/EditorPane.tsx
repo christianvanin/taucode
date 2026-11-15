@@ -9,7 +9,9 @@ import {
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { serverForLanguage } from "@/modules/lsp/lib/presets";
 import { useLspRuntimeStore } from "@/modules/lsp/lib/runtimeStore";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { currentWorkspaceEnv } from "@/modules/workspace";
 import { Editor, type OnMount } from "@monaco-editor/react";
 import type * as MonacoNS from "monaco-editor";
 import {
@@ -73,14 +75,18 @@ export type EditorPaneHandle = {
   format: () => void;
   /** Save file contents to disk (blocked if read-only). */
   save?: () => Promise<void>;
+  /** Save file contents directly to disk without prompting Save As dialog, even if temporary. */
+  saveToDiskDirect?: () => Promise<boolean>;
 };
 
 type Props = {
   path: string;
+  isTemporary?: boolean;
   overrideLanguage?: string | null;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
+  onPromoteTemporary?: (newPath: string, newTitle: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -184,7 +190,11 @@ function useMonacoLspHandle(
 
 export const EditorPane = memo(
   forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
-    const { path, overrideLanguage, onDirtyChange, onSaved, onClose } = props;
+    const { path, isTemporary, overrideLanguage, onDirtyChange, onSaved, onClose, onPromoteTemporary } = props;
+    const isTemporaryRef = useRef(isTemporary);
+    isTemporaryRef.current = isTemporary;
+    const onPromoteTemporaryRef = useRef(onPromoteTemporary);
+    onPromoteTemporaryRef.current = onPromoteTemporary;
 
     const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
       useDocument({ path, onDirtyChange });
@@ -354,6 +364,44 @@ export const EditorPane = memo(
         toast.warning(
           "Questa skill è predefinita di Gemini ed è protetta in sola lettura. Non può essere modificata.",
         );
+        return;
+      }
+
+      if (isTemporaryRef.current) {
+        const defaultFilename = pathRef.current.split(/[\\/]/).pop() || "untitled.txt";
+        let chosenPath: string | null = null;
+        try {
+          chosenPath = await saveDialog({
+            defaultPath: defaultFilename,
+          });
+        } catch (e) {
+          toast.error("Salvataggio fallito", { description: String(e) });
+          return;
+        }
+        if (!chosenPath) return; // User cancelled
+
+        const editor = editorRef.current;
+        const content = editor ? editor.getValue() : "";
+        try {
+          await invoke("fs_write_file", {
+            path: chosenPath,
+            content,
+            workspace: currentWorkspaceEnv(),
+            source: "editor",
+          });
+        } catch (e) {
+          toast.error("Impossibile salvare il file", { description: String(e) });
+          return;
+        }
+
+        const oldTempPath = pathRef.current;
+        const newTitle = chosenPath.split(/[\\/]/).pop() || chosenPath;
+        pathRef.current = chosenPath;
+        isTemporaryRef.current = false;
+        onPromoteTemporaryRef.current?.(chosenPath, newTitle);
+        void invoke("fs_cleanup_temp_file", { path: oldTempPath });
+        toast.success(`File salvato in: ${chosenPath}`);
+        onSavedRef.current?.();
         return;
       }
 
@@ -630,6 +678,7 @@ export const EditorPane = memo(
           }
         },
         save: () => performSaveRef.current(),
+        saveToDiskDirect: () => saveRef.current(),
       }),
       [path, doc.status],
     );

@@ -115,6 +115,9 @@ fn write_atomic(target: &Path, content: &[u8]) -> std::io::Result<()> {
     let parent = target.parent().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, "path has no parent")
     })?;
+    if !parent.exists() {
+        fs::create_dir_all(parent)?;
+    }
     let mut tmp = NamedTempFile::new_in(parent)?;
     tmp.as_file_mut().write_all(content)?;
     tmp.as_file_mut().sync_all()?;

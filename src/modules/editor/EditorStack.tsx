@@ -13,6 +13,7 @@ type Props = {
   onCloseTab: (id: number) => void;
   onSetMarkdownView: (id: number, mode: "rendered" | "raw") => void;
   onSetSvgView?: (id: number, mode: "preview" | "raw") => void;
+  onPromoteTemporary?: (id: number, newPath: string, newTitle: string) => void;
   borderless?: boolean;
 };
 
@@ -24,6 +25,7 @@ export function EditorStack({
   onCloseTab,
   onSetMarkdownView,
   onSetSvgView,
+  onPromoteTemporary,
   borderless = true,
 }: Props) {
   const editors = tabs.filter(
@@ -134,9 +136,13 @@ export function EditorStack({
               <EditorPane
                 ref={getRefCallback(t.id)}
                 path={t.path}
+                isTemporary={t.isTemporary}
                 overrideLanguage={t.overrideLanguage}
                 onDirtyChange={getDirtyCallback(t.id)}
                 onClose={getCloseCallback(t.id)}
+                onPromoteTemporary={(newPath, newTitle) =>
+                  onPromoteTemporary?.(t.id, newPath, newTitle)
+                }
               />
             </div>
           </div>

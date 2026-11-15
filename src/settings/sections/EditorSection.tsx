@@ -12,6 +12,7 @@ import {
   FORMATTERS,
 } from "@/modules/editor/lib/externalFormat";
 import { EXPOSED_LANGUAGES } from "@/modules/editor/lib/languageDefinitions";
+import { useTranslation } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   AUTO_SAVE_DELAY_MAX,
@@ -37,6 +38,7 @@ import { SettingRow } from "../components/SettingRow";
 const AUTO_SAVE_STEP = 100;
 
 export function EditorSection() {
+  const { t } = useTranslation();
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
@@ -53,22 +55,22 @@ export function EditorSection() {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
-        title="Editor"
-        description="Editing behavior, formatting, and saving."
+        title={t("settings.editor.title")}
+        description={t("settings.editor.desc")}
       />
 
       <div className="flex flex-col gap-2">
-        <Label>Editing</Label>
+        <Label>{t("settings.editor.groupEditing")}</Label>
         <SettingRow
-          title="Word wrap"
-          description="Wrap long lines instead of scrolling horizontally."
+          title={t("settings.editor.wordWrap")}
+          description={t("settings.editor.wordWrapDesc")}
         >
           <Switch
             checked={editorWordWrap}
             onCheckedChange={(v) => void setEditorWordWrap(v)}
           />
         </SettingRow>
-        <SettingRow title="Font size" description="Code editor text size.">
+        <SettingRow title={t("settings.editor.fontSize")} description={t("settings.editor.fontSizeDesc")}>
           <Select
             value={String(editorFontSize)}
             onValueChange={(v) => void setEditorFontSize(Number(v))}
@@ -92,10 +94,10 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Saving</Label>
+        <Label>{t("settings.editor.groupSaving")}</Label>
         <SettingRow
-          title="Auto save"
-          description="Automatically save files after a delay when changes are detected."
+          title={t("settings.editor.autoSave")}
+          description={t("settings.editor.autoSaveDesc")}
         >
           <Switch
             checked={editorAutoSave}
@@ -109,8 +111,8 @@ export function EditorSection() {
           />
         )}
         <SettingRow
-          title="Format on save"
-          description="Format the file on explicit save (Cmd+S / :w) with the formatter below."
+          title={t("settings.editor.formatOnSave")}
+          description={t("settings.editor.formatOnSaveDesc")}
         >
           <Switch
             checked={editorFormatOnSave}
@@ -120,8 +122,8 @@ export function EditorSection() {
         {editorFormatOnSave && (
           <>
             <SettingRow
-              title="Formatter"
-              description="Language server formats the buffer before writing; external tools run on the saved file from your PATH."
+              title={t("settings.editor.formatter")}
+              description={t("settings.editor.formatterDesc")}
             >
               <FormatterSelect
                 value={editorFormatter}
@@ -167,6 +169,7 @@ function FormatterSelect({
 }
 
 function CustomFormatCommandInput() {
+  const { t } = useTranslation();
   const stored = usePreferencesStore((s) => s.editorCustomFormatCommand);
   const [draft, setDraft] = useState(stored);
 
@@ -176,8 +179,8 @@ function CustomFormatCommandInput() {
 
   return (
     <SettingRow
-      title="Custom command"
-      description="Runs on the saved file; {file} is replaced with the quoted path (appended when omitted)."
+      title={t("settings.editor.customFormatCommand")}
+      description={t("settings.editor.customFormatCommandDesc")}
     >
       <Input
         value={draft}
@@ -196,6 +199,7 @@ function CustomFormatCommandInput() {
 }
 
 function FormatterOverrides() {
+  const { t } = useTranslation();
   const byLang = usePreferencesStore((s) => s.editorFormatterByLang);
   const entries = Object.entries(byLang);
   const unused = EXPOSED_LANGUAGES.filter((l) => !(l.ext in byLang));
@@ -206,8 +210,8 @@ function FormatterOverrides() {
   return (
     <>
       <SettingRow
-        title="Language overrides"
-        description="Use a different formatter for specific languages (e.g. Ruff for Python)."
+        title={t("settings.editor.languageOverrides")}
+        description={t("settings.editor.languageOverridesDesc")}
       >
         <button
           type="button"
@@ -218,7 +222,7 @@ function FormatterOverrides() {
             if (first) update({ ...byLang, [first.ext]: "lsp" });
           }}
         >
-          Add override
+          {t("settings.editor.addOverride")}
         </button>
       </SettingRow>
       {entries.map(([lang, formatter]) => (

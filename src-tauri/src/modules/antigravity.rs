@@ -19,6 +19,7 @@ use std::os::windows::process::CommandExt;
 pub struct BackendState {
     pub child: Option<std::process::Child>,
     pub current_workspace: Option<String>,
+    pub current_env: Option<crate::modules::workspace::WorkspaceEnv>,
 }
 
 pub struct BackendProcess(pub Mutex<BackendState>);
@@ -108,35 +109,166 @@ async fn fetch_latest_manifest() -> Result<ReleaseManifest, String> {
     Ok(manifest)
 }
 
+/// Esegue --version direttamente sul binario per ottenere la versione reale presente su disco.
+fn get_binary_version(path: &Path) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+    let mut cmd = Command::new(path);
+    cmd.arg("--version");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    if let Ok(output) = cmd.output() {
+        if output.status.success() {
+            let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !out_str.is_empty() {
+                let first_line = out_str.lines().next().unwrap_or("").trim();
+                let ver = first_line
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or(first_line)
+                    .strip_prefix('v')
+                    .unwrap_or_else(|| first_line.split_whitespace().last().unwrap_or(first_line))
+                    .trim();
+                if !ver.is_empty() {
+                    return Some(ver.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scompone una stringa di versione (es. "1.5.3") in numeri per il confronto.
+fn parse_version_parts(v: &str) -> Vec<u64> {
+    v.trim_start_matches('v')
+        .split(|c: char| !c.is_ascii_digit())
+        .filter_map(|s| s.parse::<u64>().ok())
+        .collect()
+}
+
+/// Restituisce true se candidate è una versione strettamente più recente di current.
+fn is_version_newer(candidate: &str, current: &str) -> bool {
+    let cand_parts = parse_version_parts(candidate);
+    let curr_parts = parse_version_parts(current);
+    let max_len = cand_parts.len().max(curr_parts.len());
+    for i in 0..max_len {
+        let c = cand_parts.get(i).copied().unwrap_or(0);
+        let cur = curr_parts.get(i).copied().unwrap_or(0);
+        if c > cur {
+            return true;
+        } else if c < cur {
+            return false;
+        }
+    }
+    false
+}
+
+/// Individua il percorso del binario agy / agy.exe globale presente sul sistema.
+fn find_global_agy_path() -> Option<PathBuf> {
+    let exe_name = if cfg!(target_os = "windows") { "agy.exe" } else { "agy" };
+    if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+        let p = PathBuf::from(home).join(".gemini").join("bin").join(exe_name);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let p = dir.join(exe_name);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+/// Sincronizza in modo sicuro il binario sorgente nella destinazione target privata,
+/// gestendo eventuali processi in blocco o lock su Windows.
+fn safe_sync_binary(source: &Path, target: &Path) -> Result<(), String> {
+    if let Some(parent) = target.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    // Prova prima la copia diretta
+    if std::fs::copy(source, target).is_ok() {
+        #[cfg(not(target_os = "windows"))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(target, std::fs::Permissions::from_mode(0o755));
+        }
+        return Ok(());
+    }
+
+    // Se fallisce (es. file in uso/locked su Windows), arresta i processi del backend
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/c", "taskkill /f /im taucode-antigravity.exe >nul 2>&1"]);
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let _ = cmd.output();
+    }
+    kill_process_on_port(BACKEND_PORT);
+    kill_process_on_port(PROXY_PORT);
+
+    // Esegui rinomina atomica del file locked prima di copiare il nuovo
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let old_path = target.with_extension(format!("exe.old.{}", ts));
+    if let Ok(_) = std::fs::rename(target, &old_path) {
+        let _ = std::fs::remove_file(&old_path);
+    }
+
+    std::fs::copy(source, target).map_err(|e| format!("Impossibile sincronizzare binario: {e}"))?;
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(target, std::fs::Permissions::from_mode(0o755));
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_antigravity_status(app: AppHandle) -> Result<AntigravityStatus, String> {
     let exe_path = get_private_agy_path(&app);
     let mut installed = exe_path.as_ref().map(|p| p.exists()).unwrap_or(false);
 
-    if !installed {
-        if let Some(ref target_path) = exe_path {
-            if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
-                let exe_name = if cfg!(target_os = "windows") { "agy.exe" } else { "agy" };
-                let global_agy = PathBuf::from(home).join(".gemini").join("bin").join(exe_name);
-                if global_agy.exists() {
-                    if let Some(parent) = target_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    if std::fs::copy(&global_agy, target_path).is_ok() {
-                        #[cfg(not(target_os = "windows"))]
-                        {
-                            use std::os::unix::fs::PermissionsExt;
-                            let _ = std::fs::set_permissions(target_path, std::fs::Permissions::from_mode(0o755));
-                        }
-                        installed = true;
-                    }
-                }
+    // 1. Interroga SEMPRE prima di tutto il binario locale reale con --version per avere la versione effettiva
+    let mut current_version = if installed {
+        exe_path.as_ref().and_then(|p| get_binary_version(p))
+    } else {
+        None
+    };
+
+    // 2. Verifica se esiste un binario agy / agy.exe globale sul sistema e ne legge la versione
+    let global_agy = find_global_agy_path();
+    let global_version = global_agy.as_ref().and_then(|p| get_binary_version(p));
+
+    if let (Some(ref target_path), Some(ref src_path)) = (&exe_path, &global_agy) {
+        let should_sync = match (&current_version, &global_version) {
+            // Se il binario locale non esiste o non risponde, sincronizza subito da quello globale
+            (None, Some(_)) => true,
+            // Se agy.exe globale ha una versione più nuova di quella locale, sincronizza senza scaricare da internet!
+            (Some(curr), Some(glob)) => is_version_newer(glob, curr),
+            _ => false,
+        };
+
+        if should_sync {
+            if safe_sync_binary(src_path, target_path).is_ok() {
+                installed = true;
+                // Rileva la nuova versione reale post-sincronizzazione
+                current_version = get_binary_version(target_path).or(global_version.clone());
             }
         }
     }
 
-    let mut current_version = None;
-    if installed {
+    // 3. Fallback al file version.json SOLO se l'esecuzione del binario ha fallito (es. crash o permessi)
+    if installed && current_version.is_none() {
         if let Some(v_path) = get_version_file_path(&app) {
             if let Ok(content) = std::fs::read_to_string(v_path) {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -144,33 +276,19 @@ pub async fn get_antigravity_status(app: AppHandle) -> Result<AntigravityStatus,
                 }
             }
         }
-        if current_version.is_none() {
-            if let Some(ref path) = exe_path {
-                let mut cmd = Command::new(path);
-                cmd.arg("--version");
-                #[cfg(target_os = "windows")]
-                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-                if let Ok(output) = cmd.output() {
-                    if output.status.success() {
-                        let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                        if !out_str.is_empty() {
-                            let ver = out_str.strip_prefix('v').unwrap_or(&out_str).trim().to_string();
-                            current_version = Some(ver.clone());
-                            if let Some(v_path) = get_version_file_path(&app) {
-                                let _ = std::fs::write(v_path, serde_json::json!({ "version": ver }).to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
+    // 4. Salva SEMPRE la versione reale nel file version.json in modo che il json sia perfettamente sincronizzato con il binario
+    if let (Some(v_path), Some(ref ver)) = (get_version_file_path(&app), &current_version) {
+        let _ = std::fs::write(v_path, serde_json::json!({ "version": ver }).to_string());
+    }
+
+    // 5. Verifica manifest online per eventuali release più recenti
     let manifest = fetch_latest_manifest().await.ok();
     let latest_version = manifest.map(|m| m.version);
 
     let update_available = match (&current_version, &latest_version) {
-        (Some(curr), Some(latest)) => curr != latest,
+        (Some(curr), Some(latest)) => is_version_newer(latest, curr),
         (None, Some(_)) if installed => false,
         _ => false,
     };
@@ -672,6 +790,16 @@ fn fetch_and_patch_main_js() -> std::io::Result<Arc<Vec<u8>>> {
     body_str = body_str.replace(
         "function Lid(a,b=window.location.origin,c){if(!a||a===\"null\")return!1;",
         "function Lid(a,b=window.location.origin,c){if(!a||a===\"null\")return!1;if(a.includes(\"localhost\")||a.includes(\"127.0.0.1\"))return!0;",
+    );
+
+    // Universal fix: Automatically open system default browser on Google OAuth Login URL
+    body_str = body_str.replace(
+        "setSnapshot(a){var b=this.snapshot;if(b.active!==a.active||b.authUrl!==a.authUrl||b.mode!==a.mode)this.snapshot=a,this.emitter.fire(a)}",
+        "setSnapshot(a){var b=this.snapshot;if(b.active!==a.active||b.authUrl!==a.authUrl||b.mode!==a.mode){this.snapshot=a;this.emitter.fire(a);if(a&&a.active&&a.authUrl&&a.authUrl!==b?.authUrl){try{window.parent.postMessage({channel:\"agy-ext-extension-api\",type:\"postmessage-rpc\",requestId:Math.floor(Math.random()*1000000),rpcPath:\"openUrl\",payload:{url:a.authUrl}},\"*\")}catch(e){console.warn(\"[Antigravity Auth] Open browser error:\",e);}}}}",
+    );
+    body_str = body_str.replace(
+        "Sc=(0,B.useCallback)(fc=>{fc&&(xa?.clipboardService?xa.clipboardService.writeClipboardText(fc):Wy(fc),Sl(\"Copied sign-in link to clipboard\",\"polite\"))},[xa?.clipboardService])",
+        "Sc=(0,B.useCallback)(fc=>{if(fc){try{xa?.clipboardService?xa.clipboardService.writeClipboardText(fc):Wy(fc);Sl(\"Copied sign-in link to clipboard\",\"polite\");window.parent.postMessage({channel:\"agy-ext-extension-api\",type:\"postmessage-rpc\",requestId:Math.floor(Math.random()*1000000),rpcPath:\"openUrl\",payload:{url:fc}},\"*\")}catch(e){console.warn(\"[Antigravity Auth] Open browser error:\",e);}}},[xa?.clipboardService])",
     );
 
     let patched_body = body_str.into_bytes();
@@ -1718,12 +1846,48 @@ pub async fn start_antigravity_backend(
     app: AppHandle,
     state: State<'_, BackendProcess>,
     workspace_root: Option<String>,
+    workspace_env: Option<crate::modules::workspace::WorkspaceEnv>,
 ) -> Result<(), String> {
-    let norm_workspace = workspace_root
-        .as_deref()
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.replace('/', "\\"));
+    let norm_workspace = match (
+        workspace_root.as_deref().map(str::trim).filter(|s| !s.is_empty()),
+        workspace_env.as_ref(),
+    ) {
+        (Some(ws), Some(crate::modules::workspace::WorkspaceEnv::Wsl { distro })) => {
+            let clean = ws.trim_start_matches('/');
+            if ws == "/" || clean.is_empty() {
+                None
+            } else {
+                #[cfg(target_os = "windows")]
+                {
+                    let host_path = crate::modules::workspace::wsl_path_to_host(distro, ws);
+                    Some(host_path.to_string_lossy().to_string())
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    Some(ws.to_string())
+                }
+            }
+        }
+        (Some(ws), _) => {
+            #[cfg(target_os = "windows")]
+            {
+                if crate::modules::workspace::is_windows_drive_path(ws)
+                    || ws.starts_with(r"\\")
+                    || ws.starts_with("//")
+                {
+                    let clean = ws.trim_start_matches('/');
+                    Some(clean.replace('/', "\\"))
+                } else {
+                    None
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                Some(ws.to_string())
+            }
+        }
+        (None, _) => None,
+    };
 
     if let Ok(mut handle_guard) = PROXY_APP_HANDLE.lock() {
         *handle_guard = Some(app.clone());
@@ -1734,17 +1898,23 @@ pub async fn start_antigravity_backend(
     let backend_listening = std::net::TcpStream::connect(format!("127.0.0.1:{}", BACKEND_PORT)).is_ok();
     let proxy_listening = std::net::TcpStream::connect(format!("127.0.0.1:{}", PROXY_PORT)).is_ok();
 
-    // Se sia il backend (8086) sia il proxy (8085) stanno già girando:
-    if backend_listening && proxy_listening && lock.child.is_some() {
-        lock.current_workspace = norm_workspace;
+    // Se sia il backend (8086) sia il proxy (8085) stanno già girando per lo STESSO workspace e STESSO env:
+    if backend_listening
+        && proxy_listening
+        && lock.child.is_some()
+        && lock.current_workspace == norm_workspace
+        && lock.current_env == workspace_env
+    {
         return Ok(());
     }
 
     // Se c'è un processo child registrato, ripuliamo
     if let Some(mut child) = lock.child.take() {
         let _ = child.kill();
+        let _ = child.wait();
     }
     lock.current_workspace = None;
+    lock.current_env = None;
 
     // Se la porta 8086 è occupata da un vecchio processo orfano, liberala
     if backend_listening {
@@ -1826,6 +1996,7 @@ pub async fn start_antigravity_backend(
 
     lock.child = Some(child);
     lock.current_workspace = norm_workspace;
+    lock.current_env = workspace_env;
 
     // Avvia il proxy HTTP su 8085 se non è già attivo
     start_proxy_listener();
@@ -1838,8 +2009,10 @@ pub fn stop_antigravity_backend(state: State<'_, BackendProcess>) -> Result<(), 
     let mut lock = state.0.lock().map_err(|_| "Mutex poisoned")?;
     if let Some(mut child) = lock.child.take() {
         let _ = child.kill();
+        let _ = child.wait();
     }
     lock.current_workspace = None;
+    lock.current_env = None;
     kill_process_on_port(BACKEND_PORT);
     kill_process_on_port(PROXY_PORT);
     if let Ok(mut guard) = CACHED_MAIN_JS.lock() {
@@ -3429,11 +3602,29 @@ fn percent_decode_simple(input: &str) -> String {
     String::from_utf8(bytes).unwrap_or_else(|_| input.to_string())
 }
 
+fn unc_to_wsl_path(path: &str, distro: &str) -> String {
+    let lower_distro = distro.to_lowercase();
+    let norm = path.replace('/', "\\");
+    let prefixes = [
+        format!(r"\\wsl.localhost\{}\", lower_distro),
+        format!(r"\\wsl$\{}\", lower_distro),
+    ];
+    let lower_norm = norm.to_lowercase();
+    for p in &prefixes {
+        if lower_norm.starts_with(p) {
+            let remainder = &norm[p.len()..];
+            let linux_path = format!("/{}", remainder.replace('\\', "/"));
+            return linux_path;
+        }
+    }
+    path.to_string()
+}
 #[tauri::command]
 pub async fn resolve_antigravity_path(
     raw_path: String,
     cascade_id: Option<String>,
     workspace_root: Option<String>,
+    workspace_env: Option<crate::modules::workspace::WorkspaceEnv>,
 ) -> Result<AntigravityResolvedPath, String> {
     let mut decoded = percent_decode_simple(&raw_path);
 
@@ -3465,13 +3656,20 @@ pub async fn resolve_antigravity_path(
 
     #[cfg(target_os = "windows")]
     {
-        if clean_str.starts_with('/') || clean_str.starts_with('\\') {
-            let bytes = clean_str.as_bytes();
-            if bytes.len() >= 3 && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
-                clean_str = clean_str[1..].to_string();
+        let lower = clean_str.to_lowercase();
+        if lower.starts_with("wsl.localhost/") || lower.starts_with("wsl.localhost\\") {
+            clean_str = format!(r"\\wsl.localhost\{}", &clean_str[14..].replace('/', "\\"));
+        } else if lower.starts_with("wsl$/") || lower.starts_with("wsl$\\") {
+            clean_str = format!(r"\\wsl$\{}", &clean_str[5..].replace('/', "\\"));
+        } else {
+            if clean_str.starts_with('/') || clean_str.starts_with('\\') {
+                let bytes = clean_str.as_bytes();
+                if bytes.len() >= 3 && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
+                    clean_str = clean_str[1..].to_string();
+                }
             }
+            clean_str = clean_str.replace('/', "\\");
         }
-        clean_str = clean_str.replace('/', "\\");
     }
 
     let mut found_path: Option<PathBuf> = None;
@@ -3482,9 +3680,24 @@ pub async fn resolve_antigravity_path(
         found_path = Some(p1);
     }
 
-    // 2. Relativo al workspace corrente
+    // 2. Relativo al workspace corrente o tradotto da WSL
     if found_path.is_none() {
-        if let Some(ref ws) = workspace_root {
+        if let Some(crate::modules::workspace::WorkspaceEnv::Wsl { ref distro }) = workspace_env {
+            #[cfg(target_os = "windows")]
+            {
+                let unc_candidate = crate::modules::workspace::wsl_path_to_host(distro, &clean_str);
+                if unc_candidate.is_file() {
+                    found_path = Some(unc_candidate);
+                } else if let Some(ref ws) = workspace_root {
+                    let rel_clean = clean_str.trim_start_matches(['/', '\\']);
+                    let joined_linux = format!("{}/{}", ws.trim_end_matches(['/', '\\']), rel_clean);
+                    let unc_rel = crate::modules::workspace::wsl_path_to_host(distro, &joined_linux);
+                    if unc_rel.is_file() {
+                        found_path = Some(unc_rel);
+                    }
+                }
+            }
+        } else if let Some(ref ws) = workspace_root {
             let p2 = Path::new(ws).join(&clean_str);
             if p2.is_file() {
                 found_path = Some(p2);
@@ -3571,7 +3784,12 @@ pub async fn resolve_antigravity_path(
         }
     }
 
-    let final_path_str = final_path_buf.to_string_lossy().to_string();
+    let host_path_str = final_path_buf.to_string_lossy().to_string();
+    let final_path_str = if let Some(crate::modules::workspace::WorkspaceEnv::Wsl { ref distro }) = workspace_env {
+        unc_to_wsl_path(&host_path_str, distro)
+    } else {
+        host_path_str
+    };
 
     Ok(AntigravityResolvedPath {
         path: final_path_str,

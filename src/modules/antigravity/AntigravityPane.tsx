@@ -15,9 +15,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useTheme } from "@/modules/theme";
+import type { WorkspaceEnv } from "@/modules/workspace";
 
 interface Props {
   workspaceRoot?: string | null;
+  workspaceEnv?: WorkspaceEnv;
   onClose?: () => void;
   onMoveToTab?: () => void;
   variant?: "tab" | "panel";
@@ -153,6 +155,7 @@ if (typeof window !== "undefined") {
 
 function AntigravityPaneComponent({
   workspaceRoot,
+  workspaceEnv,
   onClose: _onClose,
   onMoveToTab: _onMoveToTab,
   variant: _variant = "tab",
@@ -293,6 +296,11 @@ function AntigravityPaneComponent({
     workspaceRootRef.current = workspaceRoot;
   }, [workspaceRoot]);
 
+  const workspaceEnvRef = useRef(workspaceEnv);
+  useEffect(() => {
+    workspaceEnvRef.current = workspaceEnv;
+  }, [workspaceEnv]);
+
   const targetRouteRef = useRef(targetRoute);
   useEffect(() => {
     targetRouteRef.current = targetRoute;
@@ -321,18 +329,30 @@ function AntigravityPaneComponent({
   const initialTargetScreenRef = useRef(targetScreen);
 
   const isStartingRef = useRef(false);
-  const startBackend = useCallback(async (customWorkspace?: string | null) => {
-    if (isStartingRef.current) return;
+  const pendingWorkspaceRef = useRef<{ ws?: string | null; env?: WorkspaceEnv } | null>(null);
+
+  const startBackend = useCallback(async (customWorkspace?: string | null, customEnv?: WorkspaceEnv) => {
+    if (isStartingRef.current) {
+      pendingWorkspaceRef.current = { ws: customWorkspace, env: customEnv };
+      return;
+    }
     isStartingRef.current = true;
     setError(null);
+    setIframeLoaded(false);
     addLog("info", "Verifica ed avvio backend Antigravity...");
-    const targetWs = customWorkspace !== undefined ? customWorkspace : workspaceRootRef.current;
+    const rawWs = customWorkspace !== undefined ? customWorkspace : workspaceRootRef.current;
+    const targetWs = (rawWs && rawWs !== "/") ? rawWs : null;
+    const targetEnv = customEnv !== undefined ? customEnv : (workspaceEnvRef.current || null);
     try {
-      await invoke("start_antigravity_backend", { workspaceRoot: targetWs });
+      await invoke("start_antigravity_backend", {
+        workspaceRoot: targetWs,
+        workspaceEnv: targetEnv,
+      });
       addLog("info", "Backend dedicato avviato. Attesa risposta su porta 8085...");
       const ready = await waitForBackend();
       if (ready) {
         setIsReady(true);
+        setReloadKey((k) => k + 1);
         addLog("info", "Backend pronto e operativo su http://127.0.0.1:8085/");
         void runProbe();
       } else {
@@ -346,6 +366,11 @@ function AntigravityPaneComponent({
       addLog("error", `Errore startBackend: ${msg}`);
     } finally {
       isStartingRef.current = false;
+      if (pendingWorkspaceRef.current) {
+        const pending = pendingWorkspaceRef.current;
+        pendingWorkspaceRef.current = null;
+        void startBackend(pending.ws, pending.env);
+      }
     }
   }, [waitForBackend, addLog, runProbe]);
 
@@ -419,23 +444,25 @@ function AntigravityPaneComponent({
     };
   }, [loadStatus, addLog]);
 
-  // Se il workspace cambia, aggiorna in background senza disattivare l'interfaccia
+  // Se il workspace o l'ambiente cambiano, riavvia il backend e ricarica automaticamente l'iframe
   const prevWorkspaceRef = useRef(workspaceRoot);
+  const prevEnvRef = useRef(workspaceEnv);
   const isFirstMountRef = useRef(true);
   useEffect(() => {
     if (isFirstMountRef.current) {
       isFirstMountRef.current = false;
       return;
     }
-    if (prevWorkspaceRef.current !== workspaceRoot) {
+    const envChanged = JSON.stringify(prevEnvRef.current) !== JSON.stringify(workspaceEnv);
+    const wsChanged = prevWorkspaceRef.current !== workspaceRoot;
+    if (wsChanged || envChanged) {
       prevWorkspaceRef.current = workspaceRoot;
+      prevEnvRef.current = workspaceEnv;
       if (status?.installed) {
-        void invoke("start_antigravity_backend", { workspaceRoot }).catch((err) => {
-          console.warn("Aggiornamento workspace Antigravity:", err);
-        });
+        void startBackend(workspaceRoot, workspaceEnv);
       }
     }
-  }, [workspaceRoot, status?.installed]);
+  }, [workspaceRoot, workspaceEnv, status?.installed, startBackend]);
 
   // Ascolta messaggi postMessage, gestisce il bridge JSON-RPC ed errori globali
   useEffect(() => {
@@ -560,6 +587,7 @@ function AntigravityPaneComponent({
                         rawPath: rawUrl,
                         cascadeId: null,
                         workspaceRoot: workspaceRootRef.current || null,
+                        workspaceEnv: workspaceEnvRef.current || null,
                       },
                     );
                     if (resolved?.path) {
@@ -579,7 +607,15 @@ function AntigravityPaneComponent({
                   }
                 })();
               } else {
-                void openUrl(rawUrl);
+                if (showDebugRef.current) {
+                  addLog("info", `Apertura URL nel browser predefinito: ${rawUrl}`);
+                }
+                void openUrl(rawUrl).catch((err) => {
+                  console.error("[Antigravity RPC] Errore apertura URL esterno:", err);
+                  if (showDebugRef.current) {
+                    addLog("error", `Errore apertura URL esterno: ${String(err)}`);
+                  }
+                });
               }
             }
             replyPayload = { success: true };
@@ -625,6 +661,7 @@ function AntigravityPaneComponent({
                       rawPath,
                       cascadeId: cascadeId || null,
                       workspaceRoot: workspaceRootRef.current || null,
+                      workspaceEnv: workspaceEnvRef.current || null,
                     },
                   );
                   if (resolved?.path) {
@@ -665,9 +702,21 @@ function AntigravityPaneComponent({
             const stepIndex = payload?.stepIndex;
 
             if (payload?.command) {
+              let cwd = payload.cwd;
+              if (cwd && workspaceEnvRef.current?.kind === "wsl") {
+                const distro = workspaceEnvRef.current.distro.toLowerCase();
+                const normCwd = cwd.replace(/\\/g, "/");
+                const prefix = `//wsl.localhost/${distro}/`;
+                const prefixDollar = `//wsl$/${distro}/`;
+                if (normCwd.toLowerCase().startsWith(prefix)) {
+                  cwd = "/" + normCwd.slice(prefix.length);
+                } else if (normCwd.toLowerCase().startsWith(prefixDollar)) {
+                  cwd = "/" + normCwd.slice(prefixDollar.length);
+                }
+              }
               onRunInTerminalRef.current?.(
                 payload.command,
-                payload.cwd,
+                cwd,
                 payload.title || "AI Terminal",
               );
             } else if (conversationId && stepIndex != null) {
@@ -736,6 +785,7 @@ function AntigravityPaneComponent({
                       rawPath,
                       cascadeId: null,
                       workspaceRoot: workspaceRootRef.current || null,
+                      workspaceEnv: workspaceEnvRef.current || null,
                     },
                   );
                   if (resolved?.path) {
@@ -834,9 +884,20 @@ function AntigravityPaneComponent({
     }
   };
 
-  const workspaceUri = workspaceRoot
-    ? `file:///${workspaceRoot.replace(/\\/g, "/")}`
-    : "";
+  const workspaceUri = (() => {
+    if (!workspaceRoot || workspaceRoot === "/") return "";
+    const cleanRoot = workspaceRoot.replace(/^\//, "");
+    const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(cleanRoot);
+    if (isWindowsDrive) {
+      return `file:///${cleanRoot.replace(/\\/g, "/")}`;
+    }
+    if (workspaceEnv?.kind === "wsl") {
+      const trimmed = workspaceRoot.replace(/^[\/\\]+/, "").replace(/\\/g, "/");
+      if (!trimmed) return "";
+      return `file://wsl.localhost/${workspaceEnv.distro}/${trimmed}`;
+    }
+    return isWindowsDrive ? `file:///${cleanRoot.replace(/\\/g, "/")}` : "";
+  })();
 
   const route = targetRoute ? `/${targetRoute.replace(/^\//, "")}` : "/";
   const effectiveScreen = initialTargetScreenRef.current || (targetRoute?.includes("settings-standalone") ? "General" : undefined);
@@ -976,22 +1037,7 @@ function AntigravityPaneComponent({
 
         {/* Active Iframe */}
         {!checking && !error && isReady && (
-          <div className="relative flex-1 w-full h-full min-h-0 bg-background overflow-hidden overscroll-contain group">
-            {/* Controlli rapidi overlay per ricarica immediata */}
-            <div className="absolute top-2 right-2 z-30 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-background/80 backdrop-blur-md p-1 rounded-md border border-border shadow-sm">
-              <button
-                type="button"
-                title="Ricarica pannello Antigravity"
-                onClick={() => {
-                  setReloadKey((k) => k + 1);
-                  setIframeLoaded(false);
-                  void startBackend();
-                }}
-                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <HugeiconsIcon icon={Refresh01Icon} size={14} />
-              </button>
-            </div>
+          <div className="relative flex-1 w-full h-full min-h-0 bg-background overflow-hidden overscroll-contain">
             {!iframeLoaded && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
                 <HugeiconsIcon icon={Loading03Icon} size={22} className="animate-spin text-primary mb-2" />
@@ -1004,7 +1050,7 @@ function AntigravityPaneComponent({
               </div>
             )}
             <iframe
-              key={`${reloadKey}-${targetRoute || "main"}`}
+              key={`${reloadKey}-${targetRoute || "main"}-${workspaceUri}`}
               ref={iframeRef}
               src={iframeUrl}
               className="absolute inset-0 h-full w-full border-0 bg-background overscroll-contain"

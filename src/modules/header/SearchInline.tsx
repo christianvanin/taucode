@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KEY_SEP } from "@/lib/platform";
 import type { EditorPaneHandle } from "@/modules/editor";
+import { useTranslation } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getBindingTokens, SHORTCUTS } from "@/modules/shortcuts/shortcuts";
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
@@ -57,6 +58,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
       el.focus();
     }, []);
 
+    const { t } = useTranslation();
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
 
     const shortcutText = useMemo(() => {
@@ -68,7 +70,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
       return tokens.join(KEY_SEP);
     }, [userShortcuts]);
 
-    const baseLabel = target?.kind === "git-history" ? "Git search" : "Search";
+    const baseLabel = target?.kind === "git-history" ? t("header.searchGit") : t("header.searchTitle");
 
     const placeholder = useMemo(() => {
       return shortcutText ? `${baseLabel} (${shortcutText})` : baseLabel;

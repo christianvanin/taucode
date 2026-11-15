@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { fmtShortcut, MOD_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/modules/i18n";
 import { useShortcutLabel } from "@/modules/shortcuts";
 import { labelFor, type Tab, TabIcon } from "@/modules/tabs";
 import {
@@ -99,6 +100,7 @@ export function SpaceSwitcher({
   onReorderTab,
   onReorderSpaces,
 }: Props) {
+  const { t } = useTranslation();
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const setActive = useSpaces((s) => s.setActive);
@@ -255,7 +257,7 @@ export function SpaceSwitcher({
       <PopoverTrigger asChild>
         <button
           type="button"
-          title={shortcut ? `Spaces · ${shortcut}` : "Spaces"}
+          title={shortcut ? `${t("spaces.title")} · ${shortcut}` : t("spaces.title")}
           className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground/90 outline-none transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground"
         >
           <SpaceAvatar space={current} size="sm" active={true} />
@@ -286,7 +288,7 @@ export function SpaceSwitcher({
         }}
       >
         <div className="flex items-center justify-between px-1.5 pb-1.5 pt-0.5">
-          <span className="text-xs font-semibold text-foreground">Spaces</span>
+          <span className="text-xs font-semibold text-foreground">{t("spaces.title")}</span>
           {shortcut && (
             <Kbd className="h-5 bg-muted/70 text-[10px]">{shortcut}</Kbd>
           )}
@@ -340,7 +342,7 @@ export function SpaceSwitcher({
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.75} />
-            <span className="flex-1">New space</span>
+            <span className="flex-1">{t("spaces.newSpace")}</span>
           </button>
         </div>
       </PopoverContent>
@@ -417,6 +419,7 @@ function SpaceRow({
   onJumpTab,
   onCloseTab,
 }: SpaceRowProps) {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const isDragging = dragging?.kind === "space" && dragging.id === space.id;
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
@@ -500,7 +503,7 @@ function SpaceRow({
             >
               <RowAction
                 icon={PencilEdit02Icon}
-                label="Rename space"
+                label={t("spaces.rename")}
                 onClick={onStartRename}
               />
               <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -508,8 +511,8 @@ function SpaceRow({
                   <button
                     type="button"
                     data-no-drag
-                    aria-label="New tab"
-                    title="New tab"
+                    aria-label={t("tabs.newTab")}
+                    title={t("tabs.newTab")}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     className="flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
@@ -536,7 +539,7 @@ function SpaceRow({
                       size={14}
                       strokeWidth={1.75}
                     />
-                    <span className="flex-1">Terminal</span>
+                    <span className="flex-1">{t("tabs.terminal")}</span>
                     <span className="text-xs text-muted-foreground">
                       {fmtShortcut(MOD_KEY, "T")}
                     </span>
@@ -547,7 +550,7 @@ function SpaceRow({
                       size={14}
                       strokeWidth={1.75}
                     />
-                    <span className="flex-1">Privacy</span>
+                    <span className="flex-1">{t("tabs.privacy")}</span>
                     <span className="text-xs text-muted-foreground">
                       {fmtShortcut(MOD_KEY, "R")}
                     </span>
@@ -558,14 +561,14 @@ function SpaceRow({
                       size={14}
                       strokeWidth={1.75}
                     />
-                    <span className="flex-1">Editor</span>
+                    <span className="flex-1">{t("tabs.editor")}</span>
                     <span className="text-xs text-muted-foreground">
                       {fmtShortcut(MOD_KEY, "E")}
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => onNewTab("preview")}>
                     <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} />
-                    <span className="flex-1">Preview</span>
+                    <span className="flex-1">{t("tabs.preview")}</span>
                     <span className="text-xs text-muted-foreground">
                       {fmtShortcut(MOD_KEY, "P")}
                     </span>
@@ -576,14 +579,14 @@ function SpaceRow({
                       size={14}
                       strokeWidth={1.75}
                     />
-                    <span className="flex-1">Git Graph</span>
+                    <span className="flex-1">{t("tabs.gitGraph")}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               {canDelete && (
                 <RowAction
                   icon={Delete02Icon}
-                  label="Delete space"
+                  label={t("spaces.delete")}
                   destructive
                   onClick={onDelete}
                 />
@@ -642,6 +645,7 @@ function TabRow({
   onJump: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const subtitle = subtitleFor(tab);
   const isDragging = dragging?.kind === "tab" && dragging.id === tab.id;
   const reorderEdge =
@@ -689,7 +693,7 @@ function TabRow({
             e.stopPropagation();
             onClose();
           }}
-          aria-label="Close tab"
+          aria-label={t("tabs.close")}
           className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/tab:opacity-70 hover:opacity-100"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />

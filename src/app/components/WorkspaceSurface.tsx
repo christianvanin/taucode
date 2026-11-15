@@ -4,6 +4,7 @@ import { EditorStack, GitDiffStack } from "@/modules/editor";
 import type { GitHistoryStack as GitHistoryStackType } from "@/modules/git-history";
 import type { PreviewStack as PreviewStackType } from "@/modules/preview";
 import { type Tab, type SettingsTab } from "@/modules/tabs";
+import type { WorkspaceEnv } from "@/modules/workspace";
 import { TerminalStack } from "@/modules/terminal";
 import { TauWatermark } from "@/components/icons/TerminalTauIcon";
 import { SettingsApp } from "@/settings/SettingsApp";
@@ -54,7 +55,9 @@ type Props = {
   onGitHistorySearchHandle: GitHistoryStackProps["onSearchHandle"];
   onSetMarkdownView: EditorStackProps["onSetMarkdownView"];
   onSetSvgView?: (id: number, mode: "preview" | "raw") => void;
+  onPromoteTemporary?: (id: number, newPath: string, newTitle: string) => void;
   workspaceRoot: string | null;
+  workspaceEnv?: WorkspaceEnv;
   onCloseTab: (id: number) => void;
   onOpenAntigravitySettings?: (targetScreen?: string) => void;
   onOpenFile?: (path: string, pin?: boolean, line?: number, customTitle?: string) => void;
@@ -85,7 +88,9 @@ export function WorkspaceSurface({
   onGitHistorySearchHandle,
   onSetMarkdownView,
   onSetSvgView,
+  onPromoteTemporary,
   workspaceRoot,
+  workspaceEnv,
   onCloseTab,
   onOpenAntigravitySettings,
   onOpenFile,
@@ -149,6 +154,7 @@ export function WorkspaceSurface({
           onCloseTab={onEditorCloseTab}
           onSetMarkdownView={onSetMarkdownView}
           onSetSvgView={onSetSvgView}
+          onPromoteTemporary={onPromoteTemporary}
         />
       </div>
       <div
@@ -254,6 +260,7 @@ export function WorkspaceSurface({
                 <AntigravityPane
                   key={tab.id}
                   workspaceRoot={workspaceRoot}
+                  workspaceEnv={workspaceEnv}
                   onClose={() => onCloseTab(tab.id)}
                   variant="tab"
                   targetRoute={tab.targetRoute}
