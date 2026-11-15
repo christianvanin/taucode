@@ -8,7 +8,13 @@ import { parseWorkspaceScopeKey, type WorkspaceEnv } from "@/modules/workspace";
 import { useEffect, useRef } from "react";
 import { activeSpaceEnv, freshTabCwd } from "./activeSpace";
 import { freshTerminalTab, hydrateTabs } from "./serialize";
-import { loadAll, type SpaceMeta, saveActiveId, saveSpacesList } from "./store";
+import {
+  deleteSpaceData,
+  loadAll,
+  type SpaceMeta,
+  saveActiveId,
+  saveSpacesList,
+} from "./store";
 import { useSpaces } from "./useSpaces";
 
 type Params = {
@@ -39,6 +45,12 @@ export async function isReachableDirectory(
   }
 }
 
+export type SanitizeResult = {
+  spaces: SpaceMeta[];
+  modified: boolean;
+  mergedSpaceMap: Map<string, string>;
+};
+
 export async function sanitizeAndVerifySpaces(
   spaces: SpaceMeta[],
   home: string | null,
@@ -47,7 +59,7 @@ export async function sanitizeAndVerifySpaces(
     path: string,
     env?: WorkspaceEnv,
   ) => Promise<boolean> = isReachableDirectory,
-): Promise<{ spaces: SpaceMeta[]; modified: boolean }> {
+): Promise<SanitizeResult> {
   let modified = false;
   const verifiedSpaces: SpaceMeta[] = [];
 
@@ -103,7 +115,33 @@ export async function sanitizeAndVerifySpaces(
     verifiedSpaces.push(space);
   }
 
-  return { spaces: verifiedSpaces, modified };
+  // Deduplicate spaces pointing to the same project root
+  const seenRoots = new Map<string, string>(); // normKey -> primarySpaceId
+  const deduplicatedSpaces: SpaceMeta[] = [];
+  const mergedSpaceMap = new Map<string, string>(); // duplicateId -> primaryId
+
+  for (const space of verifiedSpaces) {
+    if (!space.root) {
+      deduplicatedSpaces.push(space);
+      continue;
+    }
+    const envKind = space.env?.kind ?? "local";
+    const isWsl = envKind === "wsl";
+    const normPath = space.root.replace(/\\/g, "/").replace(/\/+$/, "");
+    const key = isWsl ? `${envKind}:${normPath}` : `${envKind}:${normPath.toLowerCase()}`;
+
+    if (seenRoots.has(key)) {
+      modified = true;
+      const primaryId = seenRoots.get(key)!;
+      mergedSpaceMap.set(space.id, primaryId);
+      continue;
+    }
+
+    seenRoots.set(key, space.id);
+    deduplicatedSpaces.push(space);
+  }
+
+  return { spaces: deduplicatedSpaces, modified, mergedSpaceMap };
 }
 
 function uniqueCwds(tabs: Tab[]): string[] {
@@ -162,23 +200,29 @@ export function useSpacesBoot({
           return;
         }
 
-        const { spaces: cleanedSpaces, modified } =
+        const { spaces: cleanedSpaces, modified, mergedSpaceMap } =
           await sanitizeAndVerifySpaces(spaces, home, launchCwd);
+
+        for (const [dupId] of mergedSpaceMap) {
+          void deleteSpaceData(dupId);
+        }
 
         if (modified) {
           void saveSpacesList(cleanedSpaces);
         }
 
         const restored: Tab[] = [];
-        for (const space of cleanedSpaces) {
-          const st = states.get(space.id);
-          if (!st) continue;
-          restored.push(...hydrateTabs(st.tabs, space.id, allocId));
+        for (const [id, st] of states) {
+          const targetSpaceId = mergedSpaceMap.get(id) ?? id;
+          if (cleanedSpaces.some((s) => s.id === targetSpaceId)) {
+            restored.push(...hydrateTabs(st.tabs, targetSpaceId, allocId));
+          }
         }
 
+        const mappedActiveId = activeId ? (mergedSpaceMap.get(activeId) ?? activeId) : null;
         const active =
-          activeId && cleanedSpaces.some((s) => s.id === activeId)
-            ? activeId
+          mappedActiveId && cleanedSpaces.some((s) => s.id === mappedActiveId)
+            ? mappedActiveId
             : cleanedSpaces[0].id;
         setActiveSpaceForNewTabs(active);
 
@@ -187,10 +231,16 @@ export function useSpacesBoot({
         const env = activeSpaceEnv(cleanedSpaces, active);
         const restoredHome = await adoptWorkspaceEnv(env);
 
-        // Active space must never be empty, else its tab list shows nothing.
-        if (!restored.some((t) => t.spaceId === active)) {
-          const cwd = freshTabCwd(env, restoredHome, launchCwd, home);
-          restored.push(freshTerminalTab(active, cwd, allocId));
+        // Every space must never be empty, else its tab list shows nothing.
+        for (const sp of cleanedSpaces) {
+          if (!restored.some((t) => t.spaceId === sp.id)) {
+            const spEnv = sp.env ?? { kind: "local" };
+            const cwd =
+              sp.id === active
+                ? freshTabCwd(spEnv, restoredHome, launchCwd, home)
+                : (sp.root ?? (spEnv.kind === "local" ? (launchCwd ?? home) : null));
+            restored.push(freshTerminalTab(sp.id, cwd, allocId));
+          }
         }
 
         await Promise.allSettled([

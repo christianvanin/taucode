@@ -310,6 +310,15 @@ export default function App() {
   });
 
   const prevSpaceRef = useRef(activeSpaceId);
+  const lastActiveTabBySpace = useRef<Map<string, number>>(new Map());
+
+  // Track active tab per space
+  useEffect(() => {
+    if (activeSpaceId && activeId) {
+      lastActiveTabBySpace.current.set(activeSpaceId, activeId);
+    }
+  }, [activeSpaceId, activeId]);
+
   useEffect(() => {
     if (!spacesHydrated || !activeSpaceId) return;
     setActiveSpaceForNewTabs(activeSpaceId);
@@ -324,9 +333,20 @@ export default function App() {
       void adoptWorkspaceEnv(meta.env);
     }
     const inSpace = tabsRef.current.filter((t) => t.spaceId === activeSpaceId);
-    if (inSpace.length === 0) return;
-    if (inSpace.some((t) => t.id === activeId)) return;
-    setActiveId(inSpace[inSpace.length - 1].id);
+    if (inSpace.length === 0) {
+      const cwd =
+        meta?.root ??
+        (meta?.env?.kind === "local" ? (home ?? undefined) : undefined);
+      const tabId = newTabInSpace(activeSpaceId, cwd);
+      setActiveId(tabId);
+      return;
+    }
+    const rememberedId = lastActiveTabBySpace.current.get(activeSpaceId);
+    if (rememberedId && inSpace.some((t) => t.id === rememberedId)) {
+      setActiveId(rememberedId);
+    } else if (!inSpace.some((t) => t.id === activeId)) {
+      setActiveId(inSpace[inSpace.length - 1].id);
+    }
   }, [
     activeSpaceId,
     activeId,
@@ -334,6 +354,8 @@ export default function App() {
     setActiveSpaceForNewTabs,
     setActiveId,
     adoptWorkspaceEnv,
+    newTabInSpace,
+    home,
   ]);
 
   useEffect(() => {
@@ -483,6 +505,7 @@ export default function App() {
     activeTab,
     launchCwd ?? home,
     workspaceEnv,
+    activeSpaceId ?? undefined,
   );
 
   useWindowTitle(activeTab, explorerRoot);
@@ -1623,90 +1646,158 @@ listen<{
     [focusPane],
   );
 
+  const attachOrOpenProject = useCallback(
+    async (dirPath: string, env: WorkspaceEnv = workspaceEnv) => {
+      await native.workspaceAuthorize(dirPath).catch(() => {});
+      const normalized = dirPath.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+      const isWsl = env.kind === "wsl";
+      const folderName =
+        normalized === "/"
+          ? (isWsl ? `WSL (${env.distro})` : "Root")
+          : normalized.split("/").filter(Boolean).pop() || "Project";
+
+      const isSamePath = (
+        p1: string | null | undefined,
+        p2: string | null | undefined,
+        e1?: WorkspaceEnv,
+        e2?: WorkspaceEnv,
+      ) => {
+        if (!p1 || !p2) return false;
+        const n1 = p1.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+        const n2 = p2.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+        const k1 = e1?.kind ?? "local";
+        const k2 = e2?.kind ?? "local";
+        if (k1 !== k2) return false;
+        if (k1 === "wsl") return n1 === n2;
+        return n1.toLowerCase() === n2.toLowerCase();
+      };
+
+      const isSubdirOrSame = (child: string, parent: string) => {
+        const nc = child.replace(/\\/g, "/").replace(/\/+$/, "");
+        const np = parent.replace(/\\/g, "/").replace(/\/+$/, "");
+        if (isWsl) return nc === np || nc.startsWith(np + "/");
+        return (
+          nc.toLowerCase() === np.toLowerCase() ||
+          nc.toLowerCase().startsWith(np.toLowerCase() + "/")
+        );
+      };
+
+      const {
+        spaces,
+        activeId: currentActiveId,
+        setActive,
+        setRoot,
+        rename,
+        setEnv,
+        create,
+        remove,
+      } = useSpaces.getState();
+
+      const existingSpace = spaces.find((s) =>
+        isSamePath(s.root, normalized, s.env, env),
+      );
+
+      if (existingSpace) {
+        // Project space ALREADY exists! Attach to it directly without creating duplicates.
+        const currentSpace = spaces.find((s) => s.id === currentActiveId);
+        if (
+          currentSpace &&
+          currentSpace.id !== existingSpace.id &&
+          !currentSpace.root
+        ) {
+          // If current space was an unassigned space (like "Default") and had a terminal running inside this project,
+          // move that terminal to the existing space so the terminal and project stay together!
+          const currTabs = tabsRef.current.filter(
+            (t) => t.spaceId === currentSpace.id,
+          );
+          let movedCount = 0;
+          for (const t of currTabs) {
+            if (t.kind === "terminal" && t.cwd && isSubdirOrSame(t.cwd, normalized)) {
+              moveTabToSpace(t.id, existingSpace.id);
+              movedCount++;
+            }
+          }
+          if (movedCount === currTabs.length && spaces.length > 1) {
+            remove(currentSpace.id);
+          }
+        }
+
+        setActive(existingSpace.id);
+        const inExisting = tabsRef.current.filter(
+          (t) => t.spaceId === existingSpace.id,
+        );
+        if (inExisting.length === 0) {
+          const tabId = newTabInSpace(existingSpace.id, normalized);
+          setActiveId(tabId);
+        } else {
+          setActiveId(inExisting[inExisting.length - 1].id);
+        }
+        toast.success(`Spazio di lavoro: ${existingSpace.name}`);
+        return;
+      }
+
+      // No space for this project exists yet!
+      const currentSpace = spaces.find((s) => s.id === currentActiveId);
+      if (currentSpace && !currentSpace.root) {
+        // Current space is unassigned (e.g. Default / New Space) -> bind it!
+        setRoot(currentSpace.id, normalized);
+        rename(currentSpace.id, folderName);
+        setEnv(currentSpace.id, env);
+        const inCurr = tabsRef.current.filter(
+          (t) => t.spaceId === currentSpace.id,
+        );
+        if (inCurr.length === 0) {
+          const tabId = newTabInSpace(currentSpace.id, normalized);
+          setActiveId(tabId);
+        }
+        toast.success(`Cartella di progetto: ${folderName}`);
+        return;
+      }
+
+      // Current space already belongs to another project -> create new space!
+      const meta = create({
+        name: folderName,
+        root: normalized,
+        env,
+      });
+      const tabId = newTabInSpace(meta.id, normalized);
+      setActive(meta.id);
+      setActiveId(tabId);
+      toast.success(`Nuovo spazio: ${folderName}`);
+    },
+    [workspaceEnv, moveTabToSpace, newTabInSpace, setActiveId],
+  );
+
   const openNativeFolderDialog = useCallback(async () => {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Open Folder in New Space",
+      title: "Open Folder",
     });
     if (typeof selected === "string") {
-      await native.workspaceAuthorize(selected).catch(() => {});
-      const normalized = selected.replace(/\\/g, "/");
-      const folderName =
-        normalized.split("/").filter(Boolean).pop() || "Folder";
-      const { create, setActive } = useSpaces.getState();
-      const meta = create({ name: folderName, root: normalized, env: workspaceEnv });
-      setActive(meta.id);
+      await attachOrOpenProject(selected, workspaceEnv);
     }
-  }, [workspaceEnv]);
+  }, [workspaceEnv, attachOrOpenProject]);
 
   const handleOpenFolder = useCallback(async () => {
     if (workspaceEnv.kind === "wsl") {
-      const root = "/";
-      await native.workspaceAuthorize(root).catch(() => {});
-      const { spaces, activeId, setRoot, rename, create, setActive } =
-        useSpaces.getState();
-      const current = spaces.find((s) => s.id === activeId);
-      if (current) {
-        setRoot(current.id, root);
-        rename(current.id, `WSL (${workspaceEnv.distro})`);
-      } else {
-        const meta = create({
-          name: `WSL (${workspaceEnv.distro})`,
-          root,
-          env: workspaceEnv,
-        });
-        setActive(meta.id);
-      }
+      await attachOrOpenProject("/", workspaceEnv);
       return;
     }
     await openNativeFolderDialog();
-  }, [workspaceEnv, openNativeFolderDialog]);
+  }, [workspaceEnv, attachOrOpenProject, openNativeFolderDialog]);
 
   const handleSetProjectRoot = useCallback(
     async (dirPath: string) => {
-      await native.workspaceAuthorize(dirPath).catch(() => {});
-      const normalized = dirPath.replace(/\\/g, "/");
-      const folderName =
-        normalized.split("/").filter(Boolean).pop() || "Folder";
-      const { spaces, activeId, setRoot, rename, create, setActive } =
-        useSpaces.getState();
-      const current = spaces.find((s) => s.id === activeId);
-      if (current) {
-        setRoot(current.id, normalized);
-        rename(current.id, folderName);
-      } else {
-        const meta = create({
-          name: folderName,
-          root: normalized,
-          env: workspaceEnv,
-        });
-        setActive(meta.id);
-      }
-      toast.success(`Cartella di progetto: ${folderName}`);
+      await attachOrOpenProject(dirPath, workspaceEnv);
     },
-    [workspaceEnv],
+    [workspaceEnv, attachOrOpenProject],
   );
 
   const handleBrowseWslRoot = useCallback(async () => {
     if (workspaceEnv.kind !== "wsl") return;
-    const root = "/";
-    await native.workspaceAuthorize(root).catch(() => {});
-    const { spaces, activeId, setRoot, rename, create, setActive } =
-      useSpaces.getState();
-    const current = spaces.find((s) => s.id === activeId);
-    if (current) {
-      setRoot(current.id, root);
-      rename(current.id, `WSL (${workspaceEnv.distro})`);
-    } else {
-      const meta = create({
-        name: `WSL (${workspaceEnv.distro})`,
-        root,
-        env: workspaceEnv,
-      });
-      setActive(meta.id);
-    }
-  }, [workspaceEnv]);
+    await attachOrOpenProject("/", workspaceEnv);
+  }, [workspaceEnv, attachOrOpenProject]);
 
   const handleCloseFolder = useCallback(() => {
     if (!activeSpaceId) return;
@@ -1723,11 +1814,14 @@ listen<{
         id: DEFAULT_SPACE_ID,
         name: "Default",
         root: null,
+        env: workspaceEnv,
       });
+      const tabId = newTabInSpace(meta.id, home ?? undefined);
       setActive(meta.id);
+      setActiveId(tabId);
       removeTabsForSpace(activeSpaceId, meta.id, home ?? undefined);
     }
-  }, [activeSpaceId, home, removeTabsForSpace]);
+  }, [activeSpaceId, home, workspaceEnv, removeTabsForSpace, newTabInSpace, setActiveId]);
 
   const activeCwd =
     activeTab?.kind === "terminal"
@@ -1743,8 +1837,10 @@ listen<{
       tabs={tabs}
       onNewSpace={() => {
         const { create, setActive } = useSpaces.getState();
-        const meta = create({ name: "New Space", root: null });
+        const meta = create({ name: "New Space", root: null, env: workspaceEnv });
+        const tabId = newTabInSpace(meta.id, home ?? undefined);
         setActive(meta.id);
+        setActiveId(tabId);
       }}
       onDeleteSpace={(id: string) => {
         const { spaces, remove, create, setActive } = useSpaces.getState();
@@ -1755,8 +1851,11 @@ listen<{
             id: DEFAULT_SPACE_ID,
             name: "Default",
             root: null,
+            env: workspaceEnv,
           });
+          const tabId = newTabInSpace(meta.id, home ?? undefined);
           setActive(meta.id);
+          setActiveId(tabId);
           removeTabsForSpace(id, meta.id, home ?? undefined);
         } else {
           const fallback = remaining[0]?.id ?? DEFAULT_SPACE_ID;
@@ -1765,7 +1864,14 @@ listen<{
         }
       }}
       onNewTabInSpace={newTabInSpace}
-      onJumpTab={(id: number) => setActiveId(id)}
+      onJumpTab={(id: number) => {
+        const targetTab = tabs.find((t) => t.id === id);
+        if (targetTab && targetTab.spaceId !== activeSpaceId) {
+          useSpaces.getState().setActive(targetTab.spaceId);
+        }
+        setActiveId(id);
+        setSwitcherOpen(false);
+      }}
       onCloseTab={(id: number) => void handleClose(id)}
       onMoveTabToSpace={moveTabToSpace}
       onReorderTab={reorderTab}
@@ -1814,9 +1920,11 @@ listen<{
 
   const handleNewSpace = useCallback(() => {
     const { create, setActive } = useSpaces.getState();
-    const meta = create({ name: "New Space", root: null });
+    const meta = create({ name: "New Space", root: null, env: workspaceEnv });
+    const tabId = newTabInSpace(meta.id, home ?? undefined);
     setActive(meta.id);
-  }, []);
+    setActiveId(tabId);
+  }, [workspaceEnv, home, newTabInSpace, setActiveId]);
 
   const currentProjectRoot = activeSpace?.root ?? explorerRoot ?? null;
 

@@ -1,6 +1,6 @@
 [package]
 name = "taucode"
-version = "1.0.8"
+version = "1.0.9"
 description = "TauCode — an open-source AI-native developer environment"
 authors = ["crynta"]
 license-file = "../LICENSE"
