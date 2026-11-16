@@ -38,6 +38,20 @@ fn trim_process_memory() {
     }
 }
 
+#[tauri::command]
+fn probe_port(port: u16) -> bool {
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+    let timeout = Duration::from_millis(400);
+    if TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), timeout).is_ok() {
+        return true;
+    }
+    if TcpStream::connect_timeout(&SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port)), timeout).is_ok() {
+        return true;
+    }
+    false
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum LaunchEntry {
     Dir(PathBuf),
@@ -284,6 +298,7 @@ pub fn run() {
             extensions::toggle_mcp_server,
             extensions::delete_mcp_server,
             trim_process_memory,
+            probe_port,
             builtin_skills::sync_builtin_skills_command,
         ])
         .build(tauri::generate_context!())

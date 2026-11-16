@@ -13,6 +13,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
 import {
   forwardRef,
   useEffect,
@@ -97,16 +98,18 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
 
     const tryPort = async (port: number) => {
       setNotice(null);
+      const targetUrl = `http://localhost:${port}`;
+      // Submits immediately so the iframe begins connecting and is not blocked
+      setDraft(targetUrl);
+      onSubmit(targetUrl);
+
+      // Verify in background with native TCP probe
       setCheckingPort(port);
-      const url = `http://localhost:${port}`;
-      const ok = await probeUrl(url);
+      const ok = await probePort(port);
       setCheckingPort(null);
       if (!ok) {
-        setNotice(`No server listening on :${port}.`);
-        return;
+        setNotice(`Attenzione: nessun server sembra rispondere sulla porta :${port}. Assicurati che il server dev sia avviato.`);
       }
-      setDraft(url);
-      onSubmit(url);
     };
 
     return (
@@ -219,23 +222,20 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
   },
 );
 
-async function probeUrl(url: string): Promise<boolean> {
+async function probePort(port: number): Promise<boolean> {
   try {
-    await fetch(url, {
-      method: "GET",
-      mode: "no-cors",
-      cache: "no-store",
-      signal: AbortSignal.timeout(900),
-    });
-    return true;
+    return await invoke<boolean>("probe_port", { port });
   } catch {
-    return false;
+    return true;
   }
 }
 
 function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+  if (/^:?\d{2,5}$/.test(trimmed)) {
+    return `http://localhost:${trimmed.replace(/^:/, "")}`;
+  }
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (/^localhost(:|\/|$)/i.test(trimmed)) return `http://${trimmed}`;
   if (/^\d{1,3}(\.\d{1,3}){3}(:|\/|$)/.test(trimmed)) return `http://${trimmed}`;
