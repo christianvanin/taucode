@@ -233,10 +233,101 @@ fn safe_sync_binary(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Verifica se un file inizia con i magic bytes gzip (0x1f, 0x8b).
+fn is_gzip_file(path: &Path) -> bool {
+    let Ok(mut f) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut magic = [0u8; 2];
+    std::io::Read::read_exact(&mut f, &mut magic).is_ok() && magic == [0x1f, 0x8b]
+}
+
+/// Estrae il binario eseguibile principale da un archivio `.tar.gz` verso `dest_path`.
+fn extract_binary_from_tar_gz(archive_path: &Path, dest_path: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(archive_path)
+        .map_err(|e| format!("Impossibile aprire archivio tar.gz: {e}"))?;
+    let gz = flate2::read::GzDecoder::new(std::io::BufReader::new(file));
+    let mut archive = tar::Archive::new(gz);
+
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("Impossibile leggere voci archivio tar.gz: {e}"))?;
+
+    let mut best_extracted = false;
+    let mut best_size: u64 = 0;
+
+    for entry_res in entries {
+        let mut entry = entry_res.map_err(|e| format!("Errore lettura voce tar.gz: {e}"))?;
+        if !entry.header().entry_type().is_file() {
+            continue;
+        }
+        let size = entry.header().size().unwrap_or(0);
+        let file_name = entry
+            .path()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or_default();
+
+        let is_named_binary = matches!(
+            file_name.as_str(),
+            "antigravity" | "agy" | "taucode-antigravity"
+        );
+
+        if is_named_binary || !best_extracted || size > best_size {
+            let mut out = std::fs::File::create(dest_path)
+                .map_err(|e| format!("Impossibile creare file estratto: {e}"))?;
+            std::io::copy(&mut entry, &mut out)
+                .map_err(|e| format!("Errore estrazione binario da tar.gz: {e}"))?;
+            std::io::Write::flush(&mut out)
+                .map_err(|e| format!("Errore flush binario estratto: {e}"))?;
+            best_extracted = true;
+            best_size = size;
+            if is_named_binary {
+                break;
+            }
+        }
+    }
+
+    if !best_extracted {
+        return Err("Nessun file eseguibile trovato nell'archivio tar.gz".to_string());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(dest_path, std::fs::Permissions::from_mode(0o755));
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_antigravity_status(app: AppHandle) -> Result<AntigravityStatus, String> {
     let exe_path = get_private_agy_path(&app);
     let mut installed = exe_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+
+    // Ripristina automaticamente eventuali installazioni precedenti su macOS/Linux in cui il .tar.gz
+    // era stato salvato direttamente al posto del binario senza estrazione.
+    if installed {
+        if let Some(ref p) = exe_path {
+            if is_gzip_file(p) {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis();
+                let extracted_tmp = p.with_extension(format!("extracted.{}", ts));
+                if extract_binary_from_tar_gz(p, &extracted_tmp).is_ok()
+                    && std::fs::rename(&extracted_tmp, p).is_ok()
+                {
+                    installed = true;
+                } else {
+                    let _ = std::fs::remove_file(&extracted_tmp);
+                    let _ = std::fs::remove_file(p);
+                    installed = false;
+                }
+            }
+        }
+    }
 
     // 1. Interroga SEMPRE prima di tutto il binario locale reale con --version per avere la versione effettiva
     let mut current_version = if installed {
@@ -406,6 +497,29 @@ pub async fn install_or_update_antigravity(
         phase: "installing".to_string(),
     });
 
+    // Se l'asset scaricato è un archivio .tar.gz (es. macOS/Linux), estrai il binario prima dell'installazione
+    let payload_path = if download_url.ends_with(".tar.gz")
+        || download_url.ends_with(".tgz")
+        || is_gzip_file(&temp_download_path)
+    {
+        let extracted_path = exe_path.with_extension(format!(
+            "extracted.{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        if let Err(e) = extract_binary_from_tar_gz(&temp_download_path, &extracted_path) {
+            let _ = std::fs::remove_file(&temp_download_path);
+            let _ = std::fs::remove_file(&extracted_path);
+            return Err(e);
+        }
+        let _ = std::fs::remove_file(&temp_download_path);
+        extracted_path
+    } else {
+        temp_download_path
+    };
+
     // 4. Termina eventuale processo backend in esecuzione prima di sostituire il binario
     {
         if let Ok(mut lock) = state.0.lock() {
@@ -449,11 +563,11 @@ pub async fn install_or_update_antigravity(
             }
         }
 
-        if let Ok(_) = std::fs::rename(&temp_download_path, &exe_path) {
+        if let Ok(_) = std::fs::rename(&payload_path, &exe_path) {
             replaced = true;
             break;
-        } else if let Ok(_) = std::fs::copy(&temp_download_path, &exe_path) {
-            let _ = std::fs::remove_file(&temp_download_path);
+        } else if let Ok(_) = std::fs::copy(&payload_path, &exe_path) {
+            let _ = std::fs::remove_file(&payload_path);
             replaced = true;
             break;
         } else {
@@ -462,7 +576,7 @@ pub async fn install_or_update_antigravity(
     }
 
     if !replaced {
-        let _ = std::fs::remove_file(&temp_download_path);
+        let _ = std::fs::remove_file(&payload_path);
         return Err(format!("Errore salvataggio eseguibile: {last_err}"));
     }
 
