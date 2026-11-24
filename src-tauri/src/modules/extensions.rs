@@ -81,6 +81,18 @@ pub struct ExtensionContributes {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ExtensionIconManifest {
+    Single(String),
+    Themed {
+        #[serde(default)]
+        light: Option<String>,
+        #[serde(default)]
+        dark: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtensionManifest {
     pub id: String,
     pub name: String,
@@ -92,13 +104,60 @@ pub struct ExtensionManifest {
     #[serde(default)]
     pub author: Option<String>,
     #[serde(default)]
-    pub icon: Option<String>,
+    pub icon: Option<ExtensionIconManifest>,
+    #[serde(rename = "iconLight", default)]
+    pub icon_light: Option<String>,
+    #[serde(rename = "iconDark", default)]
+    pub icon_dark: Option<String>,
     #[serde(default)]
     pub homepage: Option<String>,
     #[serde(rename = "minTaucodeVersion", default)]
     pub min_taucode_version: Option<String>,
     #[serde(default)]
     pub contributes: ExtensionContributes,
+}
+
+impl ExtensionManifest {
+    pub fn resolve_icons(&self, base_dir: &Path) -> (Option<String>, Option<String>, Option<String>) {
+        let mut light_rel = self.icon_light.clone();
+        let mut dark_rel = self.icon_dark.clone();
+        let mut default_rel: Option<String> = None;
+
+        if let Some(ref icon_spec) = self.icon {
+            match icon_spec {
+                ExtensionIconManifest::Single(s) => {
+                    default_rel = Some(s.clone());
+                    if light_rel.is_none() {
+                        light_rel = Some(s.clone());
+                    }
+                    if dark_rel.is_none() {
+                        dark_rel = Some(s.clone());
+                    }
+                }
+                ExtensionIconManifest::Themed { light, dark } => {
+                    if light_rel.is_none() {
+                        light_rel = light.clone();
+                    }
+                    if dark_rel.is_none() {
+                        dark_rel = dark.clone();
+                    }
+                    if default_rel.is_none() {
+                        default_rel = dark.clone().or_else(|| light.clone());
+                    }
+                }
+            }
+        }
+
+        if default_rel.is_none() {
+            default_rel = dark_rel.clone().or_else(|| light_rel.clone());
+        }
+
+        let to_abs = |rel_opt: Option<String>| -> Option<String> {
+            rel_opt.map(|rel| base_dir.join(rel).to_string_lossy().to_string())
+        };
+
+        (to_abs(default_rel), to_abs(light_rel), to_abs(dark_rel))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +169,8 @@ pub struct ExtensionInfo {
     pub description: String,
     pub author: String,
     pub icon_path: Option<String>,
+    pub icon_path_light: Option<String>,
+    pub icon_path_dark: Option<String>,
     pub homepage: Option<String>,
     pub dir_path: String,
     pub enabled: bool,
@@ -226,10 +287,7 @@ pub fn scan_installed_extensions() -> Result<Vec<ExtensionInfo>, String> {
                 if let Ok(raw) = std::fs::read_to_string(&manifest_path) {
                     if let Ok(manifest) = serde_json::from_str::<ExtensionManifest>(&raw) {
                         let is_enabled = !disabled_ids.contains(&manifest.id);
-                        let icon_path = manifest.icon.as_ref().map(|rel| {
-                            let p = path.join(rel);
-                            p.to_string_lossy().to_string()
-                        });
+                        let (icon_path, icon_path_light, icon_path_dark) = manifest.resolve_icons(&path);
 
                         extensions.push(ExtensionInfo {
                             id: manifest.id,
@@ -239,6 +297,8 @@ pub fn scan_installed_extensions() -> Result<Vec<ExtensionInfo>, String> {
                             description: manifest.description.unwrap_or_default(),
                             author: manifest.author.unwrap_or_default(),
                             icon_path,
+                            icon_path_light,
+                            icon_path_dark,
                             homepage: manifest.homepage,
                             dir_path: path.to_string_lossy().to_string(),
                             enabled: is_enabled,
@@ -528,7 +588,7 @@ pub fn install_extension_zip(app: AppHandle, zip_path: String) -> Result<Extensi
     // Sincronizza subito Skill e MCP
     sync_extensions_ai_assets(&app)?;
 
-    let icon_path = manifest.icon.as_ref().map(|rel| dest_dir.join(rel).to_string_lossy().to_string());
+    let (icon_path, icon_path_light, icon_path_dark) = manifest.resolve_icons(&dest_dir);
 
     Ok(ExtensionInfo {
         id: manifest.id,
@@ -538,6 +598,8 @@ pub fn install_extension_zip(app: AppHandle, zip_path: String) -> Result<Extensi
         description: manifest.description.unwrap_or_default(),
         author: manifest.author.unwrap_or_default(),
         icon_path,
+        icon_path_light,
+        icon_path_dark,
         homepage: manifest.homepage,
         dir_path: dest_dir.to_string_lossy().to_string(),
         enabled: true,
@@ -587,7 +649,7 @@ pub fn install_extension_git(app: AppHandle, repo_url: String) -> Result<Extensi
 
     sync_extensions_ai_assets(&app)?;
 
-    let icon_path = manifest.icon.as_ref().map(|rel| dest_dir.join(rel).to_string_lossy().to_string());
+    let (icon_path, icon_path_light, icon_path_dark) = manifest.resolve_icons(&dest_dir);
 
     Ok(ExtensionInfo {
         id: manifest.id,
@@ -597,6 +659,8 @@ pub fn install_extension_git(app: AppHandle, repo_url: String) -> Result<Extensi
         description: manifest.description.unwrap_or_default(),
         author: manifest.author.unwrap_or_default(),
         icon_path,
+        icon_path_light,
+        icon_path_dark,
         homepage: manifest.homepage,
         dir_path: dest_dir.to_string_lossy().to_string(),
         enabled: true,
@@ -732,6 +796,55 @@ mod tests {
 
         // Verifiche sui path di default
         assert!(get_taucode_extensions_dir().is_ok());
+    }
+
+    #[test]
+    fn test_themed_icons_resolution() {
+        let base = Path::new("/extensions/my-ext");
+
+        // 1. Single string icon
+        let json_single = r#"{
+            "id": "ext.single",
+            "name": "single",
+            "version": "1.0.0",
+            "icon": "icon.png"
+        }"#;
+        let manifest_single: ExtensionManifest = serde_json::from_str(json_single).unwrap();
+        let (icon, light, dark) = manifest_single.resolve_icons(base);
+        assert_eq!(icon, Some(base.join("icon.png").to_string_lossy().to_string()));
+        assert_eq!(light, Some(base.join("icon.png").to_string_lossy().to_string()));
+        assert_eq!(dark, Some(base.join("icon.png").to_string_lossy().to_string()));
+
+        // 2. Themed icon object with light & dark
+        let json_themed = r#"{
+            "id": "ext.themed",
+            "name": "themed",
+            "version": "1.0.0",
+            "icon": {
+                "light": "icons/light.svg",
+                "dark": "icons/dark.svg"
+            }
+        }"#;
+        let manifest_themed: ExtensionManifest = serde_json::from_str(json_themed).unwrap();
+        let (icon, light, dark) = manifest_themed.resolve_icons(base);
+        assert_eq!(light, Some(base.join("icons/light.svg").to_string_lossy().to_string()));
+        assert_eq!(dark, Some(base.join("icons/dark.svg").to_string_lossy().to_string()));
+        assert_eq!(icon, Some(base.join("icons/dark.svg").to_string_lossy().to_string()));
+
+        // 3. Separate iconLight and iconDark properties
+        let json_separate = r#"{
+            "id": "ext.separate",
+            "name": "separate",
+            "version": "1.0.0",
+            "icon": "icons/default.png",
+            "iconLight": "icons/light.png",
+            "iconDark": "icons/dark.png"
+        }"#;
+        let manifest_separate: ExtensionManifest = serde_json::from_str(json_separate).unwrap();
+        let (icon, light, dark) = manifest_separate.resolve_icons(base);
+        assert_eq!(icon, Some(base.join("icons/default.png").to_string_lossy().to_string()));
+        assert_eq!(light, Some(base.join("icons/light.png").to_string_lossy().to_string()));
+        assert_eq!(dark, Some(base.join("icons/dark.png").to_string_lossy().to_string()));
     }
 }
 

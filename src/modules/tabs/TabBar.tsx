@@ -48,6 +48,10 @@ import {
 import { labelFor } from "./lib/tabLabel";
 import type { EditorTab, Tab } from "./lib/useTabs";
 import { ExtensionRegistry } from "@/modules/extensions/ExtensionRegistry";
+import { useTheme } from "@/modules/theme";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { useExtensionsStore } from "@/modules/extensions/store";
+import { getExtensionIconPath } from "@/modules/extensions/types";
 
 type Props = {
   tabs: Tab[];
@@ -92,6 +96,7 @@ export function TabBar({
   onDragDockHover,
 }: Props) {
   const { t: tr } = useTranslation();
+  const { resolvedMode } = useTheme();
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -634,25 +639,36 @@ export function TabBar({
               </DropdownMenuItem>
             )}
 
-            {ExtensionRegistry.getActiveTabs().map(({ extension, tab }) => (
-              <DropdownMenuItem
-                key={`${extension.id}:${tab.id}`}
-                onSelect={() => {
-                  window.dispatchEvent(
-                    new CustomEvent("terax:open-extension-tab", {
-                      detail: {
-                        extensionId: extension.id,
-                        tabContributionId: tab.id,
-                        title: tab.title,
-                      },
-                    }),
-                  );
-                }}
-              >
-                <span className="text-[13px] shrink-0">🧩</span>
-                <span className="flex-1 truncate">{tab.title}</span>
-              </DropdownMenuItem>
-            ))}
+            {ExtensionRegistry.getActiveTabs().map(({ extension, tab }) => {
+              const iconPath = getExtensionIconPath(extension, resolvedMode);
+              return (
+                <DropdownMenuItem
+                  key={`${extension.id}:${tab.id}`}
+                  onSelect={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("terax:open-extension-tab", {
+                        detail: {
+                          extensionId: extension.id,
+                          tabContributionId: tab.id,
+                          title: tab.title,
+                        },
+                      }),
+                    );
+                  }}
+                >
+                  {iconPath ? (
+                    <img
+                      src={convertFileSrc(iconPath)}
+                      alt=""
+                      className="size-[14px] shrink-0 object-contain"
+                    />
+                  ) : (
+                    <span className="text-[13px] shrink-0">🧩</span>
+                  )}
+                  <span className="flex-1 truncate">{tab.title}</span>
+                </DropdownMenuItem>
+              );
+            })}
 
           </DropdownMenuContent>
         </DropdownMenu>
@@ -671,6 +687,7 @@ function DropIndicator() {
 }
 
 export function TabIcon({ tab }: { tab: Tab }) {
+  const { resolvedMode } = useTheme();
   if (
     tab.kind === "editor" ||
     tab.kind === "markdown" ||
@@ -736,6 +753,19 @@ export function TabIcon({ tab }: { tab: Tab }) {
   }
 
   if (tab.kind === "extension") {
+    const ext = useExtensionsStore
+      .getState()
+      .extensions.find((e) => e.id === tab.extensionId);
+    const iconPath = ext ? getExtensionIconPath(ext, resolvedMode) : null;
+    if (iconPath) {
+      return (
+        <img
+          src={convertFileSrc(iconPath)}
+          alt=""
+          className="size-[14px] shrink-0 object-contain"
+        />
+      );
+    }
     return (
       <svg
         className="size-[14px] shrink-0 text-muted-foreground"

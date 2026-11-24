@@ -69,7 +69,7 @@ Tipi di Tab supportati in TauCode IDE:
   - terminal    : Terminale integrato (param: cwd, command, title, autoClose, interactive)
   - markdown    : Visualizzatore ed editor Markdown live (param: path, title)
   - svg         : Visualizzatore SVG con zoom e griglia trasparente (param: path)
-  - blockbench  : Visualizzatore 3D modelli .bbmodel, .gltf, .obj (param: path, title)
+  - blockbench  : Visualizzatore 3D modelli .gltf, .glb, .obj (param: path, title)
   - settings    : Pannello Impostazioni TauCode (param: section: "general"|"ai"|"lsp"|...)
   - extension   : Tab estensione o plugin custom (param: extensionId, tabContributionId)
 `);

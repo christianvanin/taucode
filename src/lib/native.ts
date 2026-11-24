@@ -12,6 +12,7 @@ export type DirEntry = {
   size: number;
   mtime: number;
   gitignored: boolean;
+  isVirtual?: boolean;
 };
 
 export type CommandOutput = {

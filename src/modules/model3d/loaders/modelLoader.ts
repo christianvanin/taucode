@@ -4,7 +4,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { parseBBModel } from "./bbmodelLoader";
 import type { ModelLoadResult, Model3dStats } from "../types";
 
 function computeStats(root: THREE.Object3D, animations: THREE.AnimationClip[]): Model3dStats {
@@ -54,21 +53,9 @@ function computeStats(root: THREE.Object3D, animations: THREE.AnimationClip[]): 
 export async function loadModelFile(filePath: string, textContent?: string): Promise<ModelLoadResult> {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
 
-  // 1. Blockbench model
-  if (ext === "bbmodel") {
-    if (textContent) {
-      return parseBBModel(textContent);
-    }
-    const assetUrl = convertFileSrc(filePath);
-    const res = await fetch(assetUrl);
-    if (!res.ok) throw new Error(`Impossibile leggere file .bbmodel: HTTP ${res.status}`);
-    const jsonStr = await res.text();
-    return parseBBModel(jsonStr);
-  }
-
   const assetUrl = convertFileSrc(filePath);
 
-  // 2. glTF / GLB (Khronos standard PBR + animazioni)
+  // 1. glTF / GLB (Khronos standard PBR + animazioni)
   if (ext === "glb" || ext === "gltf") {
     return new Promise((resolve, reject) => {
       const loader = new GLTFLoader();

@@ -56,6 +56,7 @@ import {
   useSpacePersistence,
   useSpaces,
   useSpacesBoot,
+  isReachableDirectory,
 } from "@/modules/spaces";
 import { StatusBar } from "@/modules/statusbar";
 import {
@@ -1648,6 +1649,11 @@ listen<{
 
   const attachOrOpenProject = useCallback(
     async (dirPath: string, env: WorkspaceEnv = workspaceEnv) => {
+      const reachable = await isReachableDirectory(dirPath, env);
+      if (!reachable) {
+        toast.error("La cartella non esiste fisicamente su disco.");
+        return;
+      }
       await native.workspaceAuthorize(dirPath).catch(() => {});
       const normalized = dirPath.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
       const isWsl = env.kind === "wsl";
@@ -1789,6 +1795,11 @@ listen<{
 
   const handleSetProjectRoot = useCallback(
     async (dirPath: string) => {
+      const reachable = await isReachableDirectory(dirPath, workspaceEnv);
+      if (!reachable) {
+        toast.error("La cartella non esiste fisicamente su disco.");
+        return;
+      }
       await attachOrOpenProject(dirPath, workspaceEnv);
     },
     [workspaceEnv, attachOrOpenProject],

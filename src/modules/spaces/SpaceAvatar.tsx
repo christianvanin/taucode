@@ -42,19 +42,22 @@ export function SpaceAvatar({ space, size = "sm", active, className }: Props) {
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 items-center justify-center font-semibold leading-none ring-1 ring-inset",
+        "flex shrink-0 items-center justify-center font-semibold leading-none select-none transition-transform active:translate-y-[0.5px]",
         SIZES[size],
-        active ? "ring-transparent" : "ring-border/50 text-muted-foreground",
+        active ? "" : "text-muted-foreground",
         className,
       )}
       style={
         active
           ? {
               color: accent,
-              backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`,
-              boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${accent} 35%, transparent)`,
+              background: `linear-gradient(180deg, color-mix(in oklch, ${accent} 24%, transparent) 0%, color-mix(in oklch, ${accent} 14%, transparent) 100%)`,
+              boxShadow: `0 1.5px 0 0 color-mix(in oklch, ${accent} 35%, rgba(0,0,0,0.22)), 0 2px 3px -1px rgba(0,0,0,0.15), inset 0 1px 0.5px 0 rgba(255,255,255,0.45), inset 0 -1px 0.5px 0 rgba(0,0,0,0.1)`,
             }
-          : undefined
+          : {
+              background: `linear-gradient(180deg, color-mix(in oklch, var(--muted) 95%, white) 0%, color-mix(in oklch, var(--muted) 90%, black) 100%)`,
+              boxShadow: `0 1.5px 0 0 rgba(0, 0, 0, 0.16), 0 2px 3px -1px rgba(0, 0, 0, 0.1), inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0.5px 0 rgba(0, 0, 0, 0.08)`,
+            }
       }
     >
       {spaceInitial(space.name)}

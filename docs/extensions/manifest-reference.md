@@ -14,7 +14,10 @@ The `taucode-extension.json` file is the required descriptor located in the root
   "displayName": "Formatted Extension Name",
   "description": "Short summary of capabilities provided by the extension",
   "author": "Author or Organization Name",
-  "icon": "icon.svg",
+  "icon": {
+    "light": "assets/icon-light.svg",
+    "dark": "assets/icon-dark.svg"
+  },
   "homepage": "https://example.com",
   "minTaucodeVersion": "1.0.0",
   "contributes": {
@@ -39,10 +42,37 @@ The `taucode-extension.json` file is the required descriptor located in the root
 | `displayName` | `string` | No | User-friendly title displayed in Settings and UI headers. |
 | `description` | `string` | No | Clear summary of extension features. |
 | `author` | `string` | No | Publisher or organization name. |
-| `icon` | `string` | No | Relative path to SVG or PNG icon (e.g., `icon.svg`). |
+| `icon` | `string \| object` | No | Path to icon, or an object with `"light"` and `"dark"` paths for theme-adaptive icons (e.g. `{"light": "icon-light.svg", "dark": "icon-dark.svg"}`). |
+| `iconLight` | `string` | No | Alternative relative path to the light theme icon. |
+| `iconDark` | `string` | No | Alternative relative path to the dark theme icon. |
 | `homepage` | `string` | No | URL to documentation or repository. |
 | `minTaucodeVersion` | `string` | No | Minimum compatible TauCode version (e.g., `1.0.0`). |
 | `contributes` | `object` | No | Container object defining all contribution points. |
+
+### Themed Icons (Light / Dark Mode Support)
+
+Extensions can support both light and dark themes by supplying dual icons. TauCode automatically switches the icon displayed in Settings and tab headers depending on the active theme:
+
+```json
+{
+  "icon": {
+    "light": "assets/icon-light.svg",
+    "dark": "assets/icon-dark.svg"
+  }
+}
+```
+
+Or using top-level properties:
+
+```json
+{
+  "icon": "assets/icon-default.svg",
+  "iconLight": "assets/icon-light.svg",
+  "iconDark": "assets/icon-dark.svg"
+}
+```
+
+If only a single string icon is provided (`"icon": "icon.svg"`), it will be used seamlessly across all themes.
 
 ---
 

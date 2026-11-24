@@ -39,7 +39,7 @@ The available tab types can be listed by running `node scripts/tabs.cjs types` o
 | `terminal` | Interactive system shell (PowerShell/Bash/WSL) | `command` / `cmd`, `cwd`, `title`, `interactive` | `open terminal --cmd "pnpm dev" --title "Dev Server"` |
 | `markdown` | Live GitHub Flavored Markdown viewer with KaTeX support | `path` (required), `title` | `open markdown "README.md" --title "Docs"` |
 | `svg` | Vector graphics inspector with zoom, pan, and real bounding boxes | `path` (required) | `open svg "public/logo.svg"` |
-| `blockbench` | 3D model viewer for `.bbmodel`, `.gltf`, `.glb`, `.obj` with 3D orbit | `path` (required), `title` | `open blockbench "models/windmill.bbmodel"` |
+| `blockbench` | 3D model viewer for `.gltf`, `.glb`, `.obj` with 3D orbit | `path` (required), `title` | `open blockbench "models/model.glb"` |
 | `settings` | TauCode Preferences panel | `section` (`general`, `ai`, `editor`, `lsp`, `extensions`) | `open settings general` |
 | `extension` | Custom extension or plugin tab | `extensionId`, `tabContributionId`, `params` | `open extension --id "custom-tool"` |
 

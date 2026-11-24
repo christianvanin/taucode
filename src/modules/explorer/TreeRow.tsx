@@ -19,6 +19,7 @@ export type EntryRowProps = {
   path: string;
   name: string;
   isDir: boolean;
+  isVirtual?: boolean;
   isExpanded: boolean;
   depth: number;
   actions: RowActions;
@@ -38,6 +39,7 @@ function EntryRowImpl(props: EntryRowProps) {
     path,
     name,
     isDir,
+    isVirtual = false,
     isExpanded,
     depth,
     actions,
@@ -127,7 +129,7 @@ function EntryRowImpl(props: EntryRowProps) {
       >
         {name}
       </span>
-      {isDir && onSetProjectRoot && (
+      {isDir && !isVirtual && onSetProjectRoot && (
         <span
           role="button"
           tabIndex={-1}

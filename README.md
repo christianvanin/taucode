@@ -26,7 +26,7 @@
 
 ## ⚡ What is TauCode?
 
-**TauCode** is an open-source code editor and development environment built on [Tauri 2](https://tauri.app) and [Rust](https://www.rust-lang.org), designed as a high-performance, lightweight alternative to Electron-based IDEs.
+**TauCode** is an open-source code editor and development environment built on [Tauri 2](https://tauri.app) and [Rust](https://www.rust-lang.org). Originally developed upon the foundation of [crynta/terax-ai](https://github.com/crynta/terax-ai), it is designed as a high-performance, lightweight alternative to Electron-based IDEs.
 
 Existing AI-native environments often suffer from heavy memory consumption, opaque background processes, and rigid architectures. TauCode reimagines the entire developer experience from the ground up:
 
@@ -57,7 +57,7 @@ Existing AI-native environments often suffer from heavy memory consumption, opaq
 
 ### 🛠️ Specialized Native Viewers
 - **Terminal**: High-speed PTY sessions via `portable-pty` and `xterm.js`, supporting concurrent sessions, private tabs, and clean rendering.
-- **3D Model Inspector**: Interactive viewer for Blockbench `.bbmodel`, `.gltf`, `.glb`, and `.obj` files with orbit rotation, pan, zoom, and wireframe views.
+- **3D Model Inspector**: Interactive viewer for `.gltf`, `.glb`, and `.obj` 3D files with orbit rotation, pan, zoom, and wireframe views.
 - **Web Preview**: Embedded sandboxed browser for previewing local development servers.
 - **Markdown Viewer**: Full GitHub Flavored Markdown renderer with KaTeX math formula rendering.
 - **Vector & PDF Inspector**: Native rendering for `.svg` graphics and `.pdf` documents.
@@ -172,6 +172,12 @@ Contributions to TauCode are welcome! Whether it's adding new LSP features, refi
 3. Commit your changes (`git commit -m "feat: add amazing feature"`)
 4. Push to your branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+---
+
+## 🙏 Acknowledgments
+
+TauCode was originally built upon the foundation of [crynta/terax-ai: Lightweight (7MB) terminal-first AI-native development environment](https://github.com/crynta/terax-ai). We extend our sincere appreciation to the original creators and contributors for their foundational work and innovative architecture.
 
 ---
 

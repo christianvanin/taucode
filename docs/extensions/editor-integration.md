@@ -145,7 +145,10 @@ Create `taucode-extension.json` in the extension root:
   "version": "1.0.0",
   "description": "Quick code navigation and checkpoints with bidirectional Monaco Editor integration",
   "author": "TauCode Community",
-  "icon": "icon.svg",
+  "icon": {
+    "light": "assets/icon-light.svg",
+    "dark": "assets/icon-dark.svg"
+  },
   "minTaucodeVersion": "1.0.0",
   "contributes": {
     "tabs": [

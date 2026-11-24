@@ -29,7 +29,6 @@ export const SUPPORTED_3D_EXTENSIONS = [
   "fbx",
   "obj",
   "stl",
-  "bbmodel",
 ] as const;
 
 export type Supported3dExtension = (typeof SUPPORTED_3D_EXTENSIONS)[number];

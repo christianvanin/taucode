@@ -11,6 +11,7 @@ export type DirEntry = {
   size: number;
   mtime: number;
   gitignored: boolean;
+  isVirtual?: boolean;
 };
 
 type ChildrenState =
@@ -91,7 +92,8 @@ function sameDirListing(a: DirEntry[], b: DirEntry[]): boolean {
     if (
       a[i].name !== b[i].name ||
       a[i].kind !== b[i].kind ||
-      a[i].gitignored !== b[i].gitignored
+      a[i].gitignored !== b[i].gitignored ||
+      Boolean(a[i].isVirtual) !== Boolean(b[i].isVirtual)
     )
       return false;
   }
@@ -201,6 +203,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
             size: 0,
             mtime: 0,
             gitignored: false,
+            isVirtual: true,
           });
           entries.sort((a, b) => {
             if (a.kind === "dir" && b.kind !== "dir") return -1;

@@ -241,7 +241,7 @@ export function RunnersSection() {
             </button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-[280px] p-0 rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl overflow-hidden"
+            className="w-[280px] p-0 gap-0 rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl overflow-hidden"
             align="end"
             sideOffset={4}
           >
@@ -289,7 +289,7 @@ export function RunnersSection() {
 
             {/* Pannello a scorrimento */}
             <ScrollArea className="max-h-[300px]">
-              <div className="p-1">
+              <div className="p-1 pr-2">
                 {filteredGroups.length === 0 ? (
                   <div className="py-8 text-center text-xs text-muted-foreground">
                     {t("settings.runners.noTargetFound")}

@@ -141,7 +141,7 @@ pub fn run() {
 
             let app_handle = _app.handle().clone();
             std::thread::spawn(move || {
-                let _ = builtin_skills::sync_builtin_skills(Some(&app_handle));
+                let _ = builtin_skills::sync_builtin_skills_if_updated(Some(&app_handle));
             });
 
             #[cfg(debug_assertions)]

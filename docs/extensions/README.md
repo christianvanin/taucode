@@ -20,7 +20,8 @@ Every extension lives in its own directory inside the user's global TauCode exte
 ├── extensions.state.json           # Extension state database (active/disabled)
 ├── publisher.sample-extension/
 │   ├── taucode-extension.json     # REQUIRED MANIFEST
-│   ├── icon.svg                   # Extension icon
+│   ├── icon-light.svg             # Extension icon for light theme
+│   ├── icon-dark.svg              # Extension icon for dark theme
 │   ├── index.html                 # Extension UI entrypoint
 │   ├── app.js
 │   └── styles.css
@@ -50,7 +51,10 @@ Every extension must include a `taucode-extension.json` file in its root directo
   "version": "1.0.0",
   "description": "Interactive data grid and chart visualizer for CSV and TSV files",
   "author": "Crynta",
-  "icon": "icon.svg",
+  "icon": {
+    "light": "icon-light.svg",
+    "dark": "icon-dark.svg"
+  },
   "homepage": "https://taucode.dev",
   "minTaucodeVersion": "1.0.0",
   "contributes": {

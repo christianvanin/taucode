@@ -64,7 +64,7 @@ Supported `kind` values:
 - `terminal`: Integrated PTY terminal (`command`, `cwd`, `title`).
 - `markdown`: Rendered GitHub Flavored Markdown viewer (`path`, `title`).
 - `svg`: Vector graphics inspector with zoom and pan (`path`).
-- `blockbench`: 3D model viewer for `.bbmodel`, `.gltf`, `.glb`, `.obj` (`path`, `title`).
+- `blockbench`: 3D model viewer for `.gltf`, `.glb`, `.obj` (`path`, `title`).
 - `settings`: IDE Preferences panel (`section`).
 
 ---

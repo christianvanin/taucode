@@ -42,11 +42,9 @@ import {
 import { useTheme } from "@/modules/theme";
 import {
   ArrowReloadHorizontalIcon,
-  BadgeCheckIcon,
   ComputerIcon,
   Download01Icon,
   Moon02Icon,
-  SparklesIcon,
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -96,38 +94,6 @@ export function GeneralSection() {
     startDownloadAndInstall,
     applyUpdateAndRestart,
   } = useUpdater();
-
-  const [syncingSkills, setSyncingSkills] = useState(false);
-  const [syncSkillsMessage, setSyncSkillsMessage] = useState<string | null>(null);
-
-  const handleSyncSkills = async () => {
-    try {
-      setSyncingSkills(true);
-      setSyncSkillsMessage(null);
-      const report = await invoke<{
-        installed: string[];
-        updated: string[];
-        up_to_date: string[];
-      }>("sync_builtin_skills_command");
-      const totalChanges = report.installed.length + report.updated.length;
-      if (totalChanges > 0) {
-        setSyncSkillsMessage(
-          `${totalChanges} skill sincronizzata/e (${report.installed.length} installate, ${report.updated.length} aggiornate).`,
-        );
-      } else {
-        setSyncSkillsMessage(
-          `Tutte le ${report.up_to_date.length} skill built-in sono già all'ultima versione.`,
-        );
-      }
-    } catch (err) {
-      setSyncSkillsMessage(
-        err instanceof Error ? err.message : "Errore durante la sincronizzazione delle skill.",
-      );
-    } finally {
-      setSyncingSkills(false);
-    }
-  };
-
 
   const autoUpdateOnLaunch = usePreferencesStore((s) => s.autoUpdateOnLaunch);
   const autostart = usePreferencesStore((s) => s.autostart);
@@ -560,12 +526,11 @@ export function GeneralSection() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-medium text-foreground">TauCode</span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
+                  <span className="text-[11px] font-mono text-muted-foreground">
                     v{currentVersion}
                   </span>
                   {updateStatus === "up-to-date" && (
-                    <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
-                      <HugeiconsIcon icon={BadgeCheckIcon} className="size-3.5" />
+                    <span className="text-[11px] font-medium text-foreground">
                       {t("settings.general.upToDate")}
                     </span>
                   )}
@@ -665,56 +630,6 @@ export function GeneralSection() {
                 checked={autoUpdateOnLaunch}
                 onCheckedChange={(v) => void setAutoUpdateOnLaunch(v)}
               />
-            </div>
-          </div>
-
-          {/* Built-in Skills Card */}
-          <div className="rounded-xl border border-border bg-card p-4 text-card-foreground">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-foreground">Skill Built-in</span>
-                  <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                    <HugeiconsIcon icon={SparklesIcon} className="size-3" />
-                    2 skill incluse
-                  </span>
-                </div>
-                <p className="text-[12px] text-muted-foreground">
-                  Skill integrate direttamente nell'app. Si sincronizzano e aggiornano automaticamente all'avvio.
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {["taucode-tabs", "skill-builder"].map(
-                    (skill) => (
-                      <span
-                        key={skill}
-                        className="rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                      >
-                        {skill}
-                      </span>
-                    ),
-                  )}
-                </div>
-                {syncSkillsMessage && (
-                  <p className="mt-1 text-[11px] font-medium text-emerald-500">
-                    {syncSkillsMessage}
-                  </p>
-                )}
-              </div>
-
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={syncingSkills}
-                onClick={() => void handleSyncSkills()}
-                className="gap-1.5 text-[12px] shrink-0"
-              >
-                {syncingSkills ? (
-                  <Spinner className="size-3.5" />
-                ) : (
-                  <HugeiconsIcon icon={ArrowReloadHorizontalIcon} className="size-3.5" />
-                )}
-                Sincronizza ora
-              </Button>
             </div>
           </div>
         </div>

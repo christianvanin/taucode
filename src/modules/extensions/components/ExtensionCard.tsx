@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useTheme } from "@/modules/theme";
 import type { ExtensionInfo } from "../types";
+import { getExtensionIconPath } from "../types";
 import { useExtensionsStore } from "../store";
 import { Delete02Icon, PackageIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -43,6 +45,8 @@ export function ExtensionCard({ extension }: Props) {
   };
 
   const title = extension.display_name || extension.name;
+  const { resolvedMode } = useTheme();
+  const iconPath = getExtensionIconPath(extension, resolvedMode);
 
   return (
     <div
@@ -56,12 +60,12 @@ export function ExtensionCard({ extension }: Props) {
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <div
           className={`flex size-10 shrink-0 items-center justify-center rounded-lg overflow-hidden ${
-            extension.icon_path ? "bg-transparent" : "border border-border bg-muted"
+            iconPath ? "bg-transparent" : "border border-border bg-muted"
           }`}
         >
-          {extension.icon_path ? (
+          {iconPath ? (
             <img
-              src={convertFileSrc(extension.icon_path)}
+              src={convertFileSrc(iconPath)}
               alt={title}
               className="size-full object-contain p-0.5"
             />

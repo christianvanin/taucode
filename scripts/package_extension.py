@@ -70,11 +70,35 @@ def package_extension(ext_dir: Path, out_dir: Path = None, auto_install: bool = 
     
     # Verifica icona
     if "icon" in manifest:
-        icon_path = ext_dir / manifest["icon"]
-        if not icon_path.exists():
-            print(f"⚠️  Attenzione: Icona dichiarata '{manifest['icon']}' non trovata.")
+        icon_val = manifest["icon"]
+        if isinstance(icon_val, str):
+            icon_path = ext_dir / icon_val
+            if not icon_path.exists():
+                print(f"⚠️  Attenzione: Icona dichiarata '{icon_val}' non trovata.")
+            else:
+                print(f"   ✓ Icona trovata: {icon_val}")
+        elif isinstance(icon_val, dict):
+            for theme_key, rel_p in icon_val.items():
+                if rel_p:
+                    ip = ext_dir / rel_p
+                    if not ip.exists():
+                        print(f"⚠️  Attenzione: Icona {theme_key} dichiarata '{rel_p}' non trovata.")
+                    else:
+                        print(f"   ✓ Icona {theme_key} trovata: {rel_p}")
+    if "iconLight" in manifest:
+        il = manifest["iconLight"]
+        ip = ext_dir / il
+        if not ip.exists():
+            print(f"⚠️  Attenzione: iconLight '{il}' non trovata.")
         else:
-            print(f"   ✓ Icona trovata: {manifest['icon']}")
+            print(f"   ✓ iconLight trovata: {il}")
+    if "iconDark" in manifest:
+        idk = manifest["iconDark"]
+        ip = ext_dir / idk
+        if not ip.exists():
+            print(f"⚠️  Attenzione: iconDark '{idk}' non trovata.")
+        else:
+            print(f"   ✓ iconDark trovata: {idk}")
             
     # Verifica skills
     contributes = manifest.get("contributes", {})

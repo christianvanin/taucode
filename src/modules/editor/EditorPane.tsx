@@ -808,7 +808,7 @@ export const EditorPane = memo(
       );
     }
 
-    const isText3d = ["bbmodel", "gltf", "obj"].includes(ext);
+    const isText3d = ["gltf", "obj"].includes(ext);
     if (isText3d && text3dMode === "3d" && doc.status === "ready") {
       return (
         <div className="relative flex h-full min-h-0 flex-col overflow-hidden">

@@ -285,10 +285,10 @@ export function getVirtualTauCodeEntries(
 
   if (isTauCode) {
     return [
-      { name: "workflow", kind: "dir", size: 0, mtime: 0, gitignored: false },
-      { name: "compile.json", kind: "file", size: 0, mtime: 0, gitignored: false },
-      { name: "run.json", kind: "file", size: 0, mtime: 0, gitignored: false },
-      { name: "AI_AGENT_INSTRUCTIONS.md", kind: "file", size: 0, mtime: 0, gitignored: false },
+      { name: "workflow", kind: "dir", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "compile.json", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "run.json", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "AI_AGENT_INSTRUCTIONS.md", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
     ];
   }
 
@@ -298,10 +298,10 @@ export function getVirtualTauCodeEntries(
 
   if (isWorkflow) {
     return [
-      { name: "compile.bat", kind: "file", size: 0, mtime: 0, gitignored: false },
-      { name: "compile.sh", kind: "file", size: 0, mtime: 0, gitignored: false },
-      { name: "run.bat", kind: "file", size: 0, mtime: 0, gitignored: false },
-      { name: "run.sh", kind: "file", size: 0, mtime: 0, gitignored: false },
+      { name: "compile.bat", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "compile.sh", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "run.bat", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
+      { name: "run.sh", kind: "file", size: 0, mtime: 0, gitignored: false, isVirtual: true },
     ];
   }
 

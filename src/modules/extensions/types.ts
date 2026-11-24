@@ -53,6 +53,13 @@ export interface ExtensionContributes {
   commands?: ExtensionCommandContribution[];
 }
 
+export type ExtensionIcon =
+  | string
+  | {
+      light?: string;
+      dark?: string;
+    };
+
 export interface ExtensionManifest {
   id: string;
   name: string;
@@ -60,7 +67,9 @@ export interface ExtensionManifest {
   displayName?: string;
   description?: string;
   author?: string;
-  icon?: string;
+  icon?: ExtensionIcon;
+  iconLight?: string;
+  iconDark?: string;
   homepage?: string;
   minTaucodeVersion?: string;
   contributes?: ExtensionContributes;
@@ -74,8 +83,20 @@ export interface ExtensionInfo {
   description: string;
   author: string;
   icon_path: string | null;
+  icon_path_light?: string | null;
+  icon_path_dark?: string | null;
   homepage: string | null;
   dir_path: string;
   enabled: boolean;
   contributes: ExtensionContributes;
+}
+
+export function getExtensionIconPath(
+  extension: ExtensionInfo,
+  resolvedMode: "light" | "dark" = "dark",
+): string | null {
+  if (resolvedMode === "light") {
+    return extension.icon_path_light || extension.icon_path || extension.icon_path_dark || null;
+  }
+  return extension.icon_path_dark || extension.icon_path || extension.icon_path_light || null;
 }

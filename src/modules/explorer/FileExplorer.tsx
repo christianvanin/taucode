@@ -86,6 +86,7 @@ type Row =
       depth: number;
       gitignored: boolean;
       gitStatusCode: GitStatusCode | null;
+      isVirtual?: boolean;
     }
   | {
       kind: "rename";
@@ -96,6 +97,7 @@ type Row =
       depth: number;
       gitignored: boolean;
       gitStatusCode: GitStatusCode | null;
+      isVirtual?: boolean;
     }
   | { kind: "pending"; key: string; depth: number; pendingKind: "file" | "dir" }
   | { kind: "status"; key: string; depth: number; tone: "muted" | "error"; message: string };
@@ -133,6 +135,7 @@ function buildRows(
       const isRenaming = tree.renaming === path;
       const gitignored = parentIgnored || entry.gitignored;
       const gitStatusCode = gitignored ? null : lookup(path);
+      const isVirtual = entry.isVirtual === true;
       if (isRenaming) {
         rows.push({
           kind: "rename",
@@ -143,6 +146,7 @@ function buildRows(
           depth,
           gitignored,
           gitStatusCode,
+          isVirtual,
         });
       } else {
         entryIndexByPath.set(path, rows.length);
@@ -156,6 +160,7 @@ function buildRows(
           depth,
           gitignored,
           gitStatusCode,
+          isVirtual,
         });
       }
       if (isDir && expanded) {
@@ -260,6 +265,7 @@ export const FileExplorer = memo(
       path: string;
       name: string;
       isDir: boolean;
+      isVirtual?: boolean;
     } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     // Bumped on every right-click so the menu content remounts and the popper
@@ -558,6 +564,7 @@ export const FileExplorer = memo(
               path={row.path}
               name={row.name}
               isDir={row.isDir}
+              isVirtual={row.isVirtual}
               isExpanded={row.kind === "entry" ? row.isExpanded : false}
               depth={row.depth}
               actions={rowActions}
@@ -750,7 +757,12 @@ export const FileExplorer = memo(
                   const row = idx !== undefined ? rows[idx] : undefined;
                   setMenuTarget(
                     row && row.kind === "entry"
-                      ? { path: row.path, name: row.name, isDir: row.isDir }
+                      ? {
+                          path: row.path,
+                          name: row.name,
+                          isDir: row.isDir,
+                          isVirtual: row.isVirtual,
+                        }
                       : null,
                   );
                   setDeleteConfirm(false);
@@ -881,7 +893,7 @@ export const FileExplorer = memo(
                       Open
                     </ContextMenuItem>
                   )}
-                  {menuTarget.isDir && onRevealInTerminal && (
+                  {menuTarget.isDir && !menuTarget.isVirtual && onRevealInTerminal && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
                       onSelect={() => onRevealInTerminal(menuTarget.path)}
@@ -889,7 +901,7 @@ export const FileExplorer = memo(
                       Open in Terminal
                     </ContextMenuItem>
                   )}
-                  {menuTarget.isDir && onSetProjectRoot && (
+                  {menuTarget.isDir && !menuTarget.isVirtual && onSetProjectRoot && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
                       onSelect={() => onSetProjectRoot(menuTarget.path)}
@@ -897,12 +909,14 @@ export const FileExplorer = memo(
                       {t("explorer.openAsProject")}
                     </ContextMenuItem>
                   )}
-                  <ContextMenuItem
-                    className={COMPACT_ITEM}
-                    onSelect={() => void revealInFinder(menuTarget.path)}
-                  >
-                    Reveal in Finder
-                  </ContextMenuItem>
+                  {!menuTarget.isVirtual && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => void revealInFinder(menuTarget.path)}
+                    >
+                      Reveal in Finder
+                    </ContextMenuItem>
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}

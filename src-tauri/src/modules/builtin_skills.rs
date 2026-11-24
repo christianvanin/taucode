@@ -195,8 +195,81 @@ fn extract_embedded_dir(dir: &Dir, target: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn get_skills_state_file_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".taucode").join("builtin_skills_version"))
+}
+
+pub fn read_last_synced_version() -> Option<String> {
+    let path = get_skills_state_file_path()?;
+    if path.exists() {
+        let content = std::fs::read_to_string(path).ok()?;
+        let trimmed = content.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}
+
+pub fn save_last_synced_version(version: &str) -> Result<(), String> {
+    let path = get_skills_state_file_path().ok_or_else(|| "Impossibile determinare la home directory".to_string())?;
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(&path, version.trim())
+        .map_err(|e| format!("Impossibile salvare la versione delle skill: {}", e))
+}
+
+/// Sincronizza le skill built-in solo se l'editor è stato aggiornato rispetto all'ultima sincronizzazione registrata.
+pub fn sync_builtin_skills_if_updated(app: Option<&AppHandle>) -> Result<Option<SyncReport>, String> {
+    let current_version = app
+        .map(|a| a.package_info().version.to_string())
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+
+    let last_version = read_last_synced_version();
+
+    if let Some(ref last) = last_version {
+        if last == &current_version {
+            log::info!(
+                "Skill built-in già sincronizzate per la versione v{}. Nessuna sincronizzazione all'avvio.",
+                current_version
+            );
+            return Ok(None);
+        }
+    }
+
+    log::info!(
+        "Aggiornamento editor rilevato (v{} -> v{}). Sincronizzazione skill built-in...",
+        last_version.as_deref().unwrap_or("none"),
+        current_version
+    );
+
+    let report = sync_builtin_skills(app)?;
+    let _ = save_last_synced_version(&current_version);
+    Ok(Some(report))
+}
+
 #[tauri::command]
 pub fn sync_builtin_skills_command(app: AppHandle) -> Result<SyncReport, String> {
-    sync_builtin_skills(Some(&app))
+    let report = sync_builtin_skills(Some(&app))?;
+    let current_version = app.package_info().version.to_string();
+    let _ = save_last_synced_version(&current_version);
+    Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version_parsing_and_comparison() {
+        let skill_md = "---\nname: my-skill\nversion: 1.2.3\n---\n# Docs";
+        assert_eq!(parse_version(skill_md), Some("1.2.3".to_string()));
+
+        assert!(is_newer_version("1.2.4", "1.2.3"));
+        assert!(is_newer_version("2.0.0", "1.9.9"));
+        assert!(!is_newer_version("1.2.3", "1.2.3"));
+        assert!(!is_newer_version("1.2.2", "1.2.3"));
+    }
 }
 

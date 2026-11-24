@@ -28,6 +28,7 @@ const EXT_MAP: Record<string, string> = {
   json: "json",
   jsonc: "jsonc",
   json5: "json",
+  bbmodel: "json",
   yaml: "yaml",
   yml: "yaml",
   toml: "plaintext", // Monaco has no built-in TOML; LSP provides highlighting
