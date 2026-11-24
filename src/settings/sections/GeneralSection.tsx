@@ -535,7 +535,7 @@ export function GeneralSection() {
                     </span>
                   )}
                   {updateStatus === "available" && (
-                    <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-500">
+                    <span className="text-[11px] font-medium text-blue-500">
                       {t("settings.general.updateAvailable", { version: updateInfo?.version ?? "" })}
                     </span>
                   )}

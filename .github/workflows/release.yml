@@ -50,6 +50,15 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Extract Commit Message for Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=format:"%B")
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build TauCode and Publish Release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -59,7 +68,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'TauCode ${{ github.ref_name }}'
-          releaseBody: 'Release automatica di TauCode ${{ github.ref_name }}. Include aggiornamento binari e sincronizzazione automatica delle skill native.'
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
